@@ -19,6 +19,10 @@ sitenames = [
     ]
 sitenames_sorted = sorted(sitenames)
 
+feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
+                'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
+                'hour', 'month' 
+                ]
 class PMSingleSiteDataset(Dataset):
     def __init__(self, sitename='美濃', target_hour=8, isTrain=False):
         

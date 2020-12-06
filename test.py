@@ -23,12 +23,15 @@ sitenames = [
     '鳳山', '麥寮', '龍潭'
     ]
 
+feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
+                'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
+                'hour', 'month' 
+                ]
 # Load data
-sitename = '美濃'
-save_dir = 'model_weights/'
-
-valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=False)
-valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
+cpt_dir = 'model_weights/'
+save_dir = 'predict_results/'
+if os.path.exists(save_dir):
+    os.mkdir(save_dir)
 
 mean_dict = {}
 std_dict = {}
@@ -36,36 +39,42 @@ with open("dataset/train_mean.json", "r") as fp:
     mean_dict = json.load(fp)
 with open("dataset/train_std.json", "r") as fp:
     std_dict = json.load(fp)
-mean = mean_dict[sitename][7]
-std = std_dict[sitename][7]
 
-# Load model 
-model = Model()
-checkpoint = torch.load(os.path.join(save_dir, "美濃-10-0.123.pt"))
-model.load_state_dict(checkpoint) 
-model.to(device)
-criterion = nn.MSELoss()
+for name in sitenames:
+    sitename = name 
+    valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=False)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
 
-predict_result = []
-sum_loss = 0
-model.eval()
-trange = tqdm(valid_dataloader)
-for idx, data in enumerate(trange):
-    # get data
-    x, y = data 
-    x = x.to(device) 
-    y = y.to(device) 
-    # get loss & update
-    o = model(x)
-    loss = criterion(o, y)
-    sum_loss += loss.item()
-    # append result
-    # Denorm the data
-    real_o = o.item() * std + mean 
-    predict_result.append(real_o)
-    trange.set_description(f"testing mean loss: {sum_loss / (idx+1):.4f}")
+    mean = mean_dict[sitename][7]
+    std = std_dict[sitename][7]
 
-valid_loss = sum_loss / len(valid_dataloader) 
-    
-# Save results
-np.save("predict.npy", predict_result)
+    # Load model 
+    model = Model()
+    checkpoint = torch.load(os.path.join(save_dir, f"{sitename}.pt"))
+    model.load_state_dict(checkpoint) 
+    model.to(device)
+    criterion = nn.MSELoss()
+
+    predict_result = []
+    sum_loss = 0
+    model.eval()
+    trange = tqdm(valid_dataloader)
+    for idx, data in enumerate(trange):
+        # get data
+        x, y = data 
+        x = x.to(device) 
+        y = y.to(device) 
+        # get loss & update
+        o = model(x)
+        loss = criterion(o, y)
+        sum_loss += loss.item()
+        # append result
+        # Denorm the data
+        real_o = o.item() * std + mean 
+        predict_result.append(real_o)
+        trange.set_description(f"testing mean loss: {sum_loss / (idx+1):.4f}")
+
+    valid_loss = sum_loss / len(valid_dataloader) 
+        
+    # Save results
+    np.save(f"{save_dir}/{sitename}.npy", predict_result)

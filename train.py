@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader 
+from datetime import datetime 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -22,6 +23,20 @@ sitenames = [
     '鳳山', '麥寮', '龍潭'
     ]
 
+feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
+                'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
+                'hour', 'month' 
+                ]
+
+no = 0 
+save_dir = 'model_weights/'
+log_dir = 'logs'
+if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+if not os.path.exists(log_dir):
+    os.mkdir(log_dir)
+if os.path.exists(f"{log_dir}/{no}"):
+    os.remove(f"{log_dir}/{no}")
 
 def update_model(loss_function, optimizer, output, target, retain_graph=False):
     loss = loss_function(output, target)
@@ -31,70 +46,72 @@ def update_model(loss_function, optimizer, output, target, retain_graph=False):
     return loss
 
 ############ train model #############
-sitename = '美濃'
-save_dir = 'model_weights/'
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+for name in sitenames:
+    #sitename = '美濃'
+    sitename = name 
+    print(sitename)
+    train_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=True)
+    valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True, drop_last=True)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
 
-train_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=True)
-valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=False)
-train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True, drop_last=True)
-valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
+    model = Model()
+    model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.MSELoss()
 
-model = Model()
-model.to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-criterion = nn.MSELoss()
+    max_epochs = 100
+    best_loss = 1e9
+    patience = 5
+    earlystop_counter = 0
 
-max_epochs = 100
-best_loss = 1e9
-patience = 5
-earlystop_counter = 0
+    for epoch in range(max_epochs):
+        print(f">>Epoch: {epoch}\n")
+        model.train()
+        sum_loss = 0
+        trange = tqdm(train_dataloader)
+        for idx, data in enumerate(trange):
+            # get data
+            x, y = data 
+            x = x.to(device) 
+            y = y.to(device) 
+            # get loss & update
+            o = model(x)
+            loss = update_model(criterion, optimizer, o, y)
+            sum_loss += loss.item()
+            trange.set_description(f"Training mean loss: {sum_loss / (idx+1):.4f}")
+        train_loss = sum_loss / len(train_dataloader)
 
-for epoch in range(max_epochs):
-    print(f">>Epoch: {epoch}\n")
-    model.train()
-    sum_loss = 0
-    trange = tqdm(train_dataloader)
-    for idx, data in enumerate(trange):
-        # get data
-        x, y = data 
-        x = x.to(device) 
-        y = y.to(device) 
-        # get loss & update
-        o = model(x)
-        loss = update_model(criterion, optimizer, o, y)
-        sum_loss += loss.item()
-        trange.set_description(f"Training mean loss: {sum_loss / (idx+1):.4f}")
-    train_loss = sum_loss / len(train_dataloader)
-
-    sum_loss = 0
-    model.eval()
-    trange = tqdm(valid_dataloader)
-    for idx, data in enumerate(trange):
-        # get data
-        x, y = data 
-        x = x.to(device) 
-        y = y.to(device) 
-        # get loss & update
-        o = model(x)
-        loss = criterion(o, y)
-        sum_loss += loss.item()
-        trange.set_description(f"validing mean loss: {sum_loss / (idx+1):.4f}")
-    
-    valid_loss = sum_loss / len(valid_dataloader) 
-    
-    if best_loss > valid_loss:
-        best_loss = valid_loss 
-        torch.save(model.state_dict(), f"checkpoint.pt")
-        earlystop_counter = 0
-        print(">> Model saved!!")
-            
-    # if best_loss doesn't improve for patience times, terminate training
-    else:
-        earlystop_counter += 1
-        if earlystop_counter >= patience:
-            print("Early stop!!!")
-            print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.3f}")
-            os.rename("checkpoint.pt", os.path.join(save_dir, f"{sitename}-{epoch}-{best_loss:.3f}.pt"))
-            break
+        sum_loss = 0
+        model.eval()
+        trange = tqdm(valid_dataloader)
+        for idx, data in enumerate(trange):
+            # get data
+            x, y = data 
+            x = x.to(device) 
+            y = y.to(device) 
+            # get loss & update
+            o = model(x)
+            loss = criterion(o, y)
+            sum_loss += loss.item()
+            trange.set_description(f"validing mean loss: {sum_loss / (idx+1):.4f}")
+        
+        valid_loss = sum_loss / len(valid_dataloader) 
+        
+        if best_loss > valid_loss:
+            best_loss = valid_loss 
+            torch.save(model.state_dict(), f"checkpoint.pt")
+            earlystop_counter = 0
+            print(">> Model saved!!")
+                
+        # if best_loss doesn't improve for patience times, terminate training
+        else:
+            earlystop_counter += 1
+            if earlystop_counter >= patience:
+                print("Early stop!!!")
+                print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.3f}")
+                os.rename("checkpoint.pt", os.path.join(save_dir, f"{sitename}.pt"))
+                # write log
+                with open(f"{log_dir}/{no}", "a") as fp:
+                    fp.write(f">>sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.3f}\ntimestamp: {datetime.now()}\n\n")
+                break

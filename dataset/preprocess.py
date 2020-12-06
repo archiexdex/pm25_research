@@ -77,23 +77,25 @@ def filter_data(data):
     # Fetch the features from data 
     data_features = data[feature_cols].values
     # Fetch the time feature
-    data_day   = np.zeros((data.shape[0], ))
-    data_time  = np.zeros((data.shape[0], ))
-    data_month = np.zeros((data.shape[0], ))
+    data_day   = np.zeros((data.shape[0], 1))
+    data_time  = np.zeros((data.shape[0], 1))
+    data_month = np.zeros((data.shape[0], 1))
     for i, d in enumerate(data['read_time'].apply(lambda x: x.weekday())):
         data_day[i,] = d
     for i, d in enumerate(data['read_time'].apply(lambda x: x.hour)):
         data_time[i] = d
     for i, d in enumerate(data['read_time'].apply(lambda x: x.month)):
         data_month[i] = d-1
+    # Append time into data_features
+    data_features = np.concatenate((data_features, data_time, data_month), axis=-1)
     # Fetch site and hash
     sn_hash = dict(zip(sitenames_sorted, range(len(sitenames_sorted))))
-    data_sn = np.zeros((data.shape[0], ))
+    data_sn = np.zeros((data.shape[0], 1))
     for i, d in enumerate(data['sn']):
         data_sn[i] = sn_hash[d]
     # Split data by sitename
     data_dict = sn_hash.copy()
-    data_features = data_features.reshape([-1, 73, 13])
+    data_features = data_features.reshape([-1, 73, 15])
     for i, key in enumerate(data_dict):
         data_dict[key] = data_features[:, i, :]
     return data_dict
