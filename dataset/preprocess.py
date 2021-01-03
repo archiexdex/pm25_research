@@ -152,10 +152,10 @@ if __name__ == '__main__':
 
     # Normalize train_data_feature
     print("normalize feature")
-    train_norm_data, train_mean, train_std = get_normalize(train_data_dict)
+    train_norm_data, train_mean, train_std = get_normalize(train_data_dict.copy())
 
     # Normalize valid_data by train
-    valid_norm_data = put_normalize(valid_data_dict, train_mean, train_std)
+    valid_norm_data = put_normalize(valid_data_dict.copy(), train_mean, train_std)
 
     # Save file
     print("Save file")

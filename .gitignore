@@ -1,8 +1,11 @@
 *.csv
 *.npy
 *.json
+*.pt
 
 __pycache__
 logs
 model_weights
 backup
+checkpoints/
+*.png

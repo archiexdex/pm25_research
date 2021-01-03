@@ -5,38 +5,58 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader 
 from datetime import datetime 
+import argparse
+from model import * 
+from dataset.dataset import PMSingleSiteDataset 
+from constants import *
+import csv 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-from model import Model 
-from dataset.dataset import PMSingleSiteDataset 
+# MARK: - Function
+def parse():
+    parser = argparse.ArgumentParser()
+    try: 
+        from argument import add_arguments 
+        parser = add_arguments(parser)
+    except:
+        pass 
+    return parser.parse_args()
 
-# size of 73
-sitenames = [
-    '三義', '三重', '中壢', '中山', '二林', '仁武', '冬山', '前金', '前鎮', '南投', 
-    '古亭', '善化', '嘉義', '土城', '埔里', '基隆', '士林', '大同', '大園', '大寮', 
-    '大里', '安南', '宜蘭', '小港', '屏東', '崙背', '左營', '平鎮', '彰化', '復興', 
-    '忠明', '恆春', '斗六', '新店', '新港', '新營', '新竹', '新莊', '朴子', '松山', 
-    '板橋', '林口', '林園', '桃園', '楠梓', '橋頭', '永和', '汐止', '沙鹿', '淡水', 
-    '湖口', '潮州', '竹山', '竹東', '線西', '美濃', '臺南', '臺東', '臺西', '花蓮', 
-    '苗栗', '菜寮', '萬華', '萬里', '西屯', '觀音', '豐原', '關山', '陽明', '頭份', 
-    '鳳山', '麥寮', '龍潭'
-    ]
+def check_folder(path, mode="f"):
+    if not os.path.exists(path):
+        os.mkdir(path)
+opt = parse()
 
-feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
-                'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
-                'hour', 'month' 
-                ]
+if opt.no is not None:
+    no = opt.no 
+else: 
+    print("n is not a number")
+    exit() 
 
-no = 0 
-save_dir = 'model_weights/'
-log_dir = 'logs'
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+cpt_dir = opt.cpt_dir 
+log_dir = opt.log_dir 
+if not os.path.exists(cpt_dir):
+    os.mkdir(cpt_dir)
 if not os.path.exists(log_dir):
     os.mkdir(log_dir)
+
+cpt_dir = os.path.join(cpt_dir, f"{no}")
+if os.path.exists(cpt_dir):
+    shutil.rmtree(cpt_dir)
+os.mkdir(cpt_dir) 
+
 if os.path.exists(f"{log_dir}/{no}"):
     os.remove(f"{log_dir}/{no}")
+    field = [
+        "sitename", 
+        "best_loss",
+        "epoch",
+        "timestamp"
+    ]
+    with open(f"{log_dir}/{no}", "w", newline='') as fp:
+        writer = csv.DictWriter(fp, fieldnames=field)
+        writer.writeheader()
 
 def update_model(loss_function, optimizer, output, target, retain_graph=False):
     loss = loss_function(output, target)
@@ -50,12 +70,13 @@ for name in sitenames:
     #sitename = '美濃'
     sitename = name 
     print(sitename)
-    train_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=True)
-    valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, isTrain=False)
+    train_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=True)
+    valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=False)
     train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
 
-    model = Model()
+#    model = Model()
+    model = SimpleRNN(target_length=8)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.MSELoss()
@@ -110,8 +131,15 @@ for name in sitenames:
             if earlystop_counter >= patience:
                 print("Early stop!!!")
                 print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.3f}")
-                os.rename("checkpoint.pt", os.path.join(save_dir, f"{sitename}.pt"))
+                os.rename("checkpoint.pt", os.path.join(cpt_dir, f"{sitename}.pt"))
                 # write log
-                with open(f"{log_dir}/{no}", "a") as fp:
-                    fp.write(f">>sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.3f}\ntimestamp: {datetime.now()}\n\n")
+                with open(f"{log_dir}/{no}", "a", newline='') as fp:
+                    writer = csv.DictWriter(fp, fieldnames=field)
+                    writer.writerow({
+                        "sitename": sitename,
+                        "best_loss": f"{best_loss:.3f}",
+                        "epoch": epoch,
+                        "timestamp": datetime.now()
+                    })
+                    #fp.write(f">>sitename: {sitename}\nepoch: {epoch}\nbest_mse_loss: {best_loss:.3f}\ntimestamp: {datetime.now()}\n\n")
                 break

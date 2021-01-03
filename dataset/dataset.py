@@ -24,7 +24,7 @@ feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'hour', 'month' 
                 ]
 class PMSingleSiteDataset(Dataset):
-    def __init__(self, sitename='美濃', target_hour=8, isTrain=False):
+    def __init__(self, sitename='美濃', target_hour=8, target_length=8, isTrain=False):
         
         filename = f"dataset/norm/train/{sitename}.npy" if isTrain else f"dataset/norm/valid/{sitename}.npy"
         if os.path.exists(filename):
@@ -33,15 +33,24 @@ class PMSingleSiteDataset(Dataset):
             raise ValueError(f"path {filename} doesn't exist")
 
         self.target_hour = target_hour 
-        self.sz = len(self.data) - target_hour 
+        self.sz = len(self.data) - target_hour - target_length  
+        self.target_length = target_length 
 
     def __len__(self):
         return self.sz 
 
     def __getitem__(self, idx):
+        """
+            x: [batch, idx:idx+target_hour, features]
+            y: [batch, idx+target_hour:idx+target_hour+target_length, 1]
+            for default 
+                x: [batch, 8, 15]
+                y: [batch, 8, 1]
+        """
         # input, target 
         x = FloatTensor(self.data[idx:idx+self.target_hour])
-        y = FloatTensor(self.data[idx+self.target_hour, 7:8])
+        # Only predict pm2.5, so select '7:8'
+        y = FloatTensor(self.data[idx+self.target_hour:idx+self.target_hour+self.target_length, 7:8])
         return x, y 
         
 #    def collate_fn(insts):

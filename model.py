@@ -23,3 +23,31 @@ class Model(nn.Module):
         out_b = self.out_b(latent[:, -1])
         output = out_w + out_b 
         return output 
+
+class SimpleDNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.dense = nn.Linear(15, 32)
+        self.out_w = nn.Linear(32, 1)
+        self.out_b = nn.Linear(32, 1)
+
+    def forward(self, x):
+        x = self.dense(x)
+        out_w = self.out_w(x)
+        out_b = self.out_b(x)
+        output = out_w + out_b 
+        return output 
+
+class SimpleRNN(nn.Module):
+    def __init__(self, target_length):
+        super().__init__()
+        self.rnn = nn.GRU(32, 32, batch_first=True)
+        self.dense_all = nn.Linear(15, 32)
+        self.out = nn.Linear(32, 1)
+        self.target_length = target_length 
+
+    def forward(self, x):
+        x = self.dense_all(x)
+        latent, hidden = self.rnn(x)
+        output = self.out(latent[:, -self.target_length:])
+        return output 
