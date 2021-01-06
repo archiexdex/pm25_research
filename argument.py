@@ -12,8 +12,13 @@ def add_arguments(parser):
     parser.add_argument('--gamma',        type=float, default=0.99, help='constant parameter')
     parser.add_argument('--batch_size',   type=int,   default=512,  help='batch size')
 
-    parser.add_argument('--cpt_dir',      type=str,   default="checkpoints",  help='')
-    parser.add_argument('--log_dir',      type=str,   default="logs",         help='')
+
+    parser.add_argument('--origin_train_dir',       type=str,   default="dataset/origin/train",  help='')
+    parser.add_argument('--origin_valid_dir',       type=str,   default="dataset/origin/valid",  help='')
+    parser.add_argument('--cpt_dir',                type=str,   default="checkpoints",           help='')
+    parser.add_argument('--log_dir',                type=str,   default="logs",                  help='')
+    parser.add_argument('--test_results_dir',       type=str,   default="test_results",          help='')
+    parser.add_argument('--visual_results_dir',     type=str,   default="visual_results",        help='')
     
     
     

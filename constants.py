@@ -15,3 +15,9 @@ feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
                 'hour', 'month' 
                 ]
+field = [
+    "sitename", 
+    "best_loss",
+    "epoch",
+    "timestamp"
+]

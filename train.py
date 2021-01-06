@@ -48,12 +48,6 @@ os.mkdir(cpt_dir)
 
 if os.path.exists(f"{log_dir}/{no}"):
     os.remove(f"{log_dir}/{no}")
-    field = [
-        "sitename", 
-        "best_loss",
-        "epoch",
-        "timestamp"
-    ]
     with open(f"{log_dir}/{no}", "w", newline='') as fp:
         writer = csv.DictWriter(fp, fieldnames=field)
         writer.writeheader()
@@ -67,16 +61,15 @@ def update_model(loss_function, optimizer, output, target, retain_graph=False):
 
 ############ train model #############
 for name in sitenames:
-    #sitename = '美濃'
     sitename = name 
     print(sitename)
     train_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=True)
     valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=False)
-    train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True, drop_last=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
 
 #    model = Model()
-    model = SimpleRNN(target_length=8)
+    model = Seq2Seq(target_length=8)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.MSELoss()

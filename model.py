@@ -51,3 +51,35 @@ class SimpleRNN(nn.Module):
         latent, hidden = self.rnn(x)
         output = self.out(latent[:, -self.target_length:])
         return output 
+
+class Seq2Seq(nn.Module):
+    def __init__(self, target_length, hidden_size=32):
+        super().__init__()
+        self.emb = nn.Linear(15, 32)
+        self.enc = nn.GRU(32, 32, batch_first=True)
+        self.dec = nn.GRU(32, 32, batch_first=True)
+        self.att = nn.Linear(hidden_size * 2, 1)
+        self.att_combine = nn.Linear(hidden_size * 2, hidden_size)
+        self.out = nn.Linear(32, 1)
+        self.target_length = target_length 
+
+    def forward(self, x):
+        x = self.emb(x)
+        latent, hidden = self.enc(x)
+        src_len = latent.shape[1]
+        enc_hidden = hidden
+        if hidden.shape[0] < 2:
+            hidden = hidden[0]
+        else:
+            hidden = hidden[0] + hidden[1]
+        hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
+        attention = self.att(torch.cat((latent, hidden), dim=-1)).squeeze(-1)
+        attention = attention.unsqueeze(1)
+        weight = torch.bmm(attention, latent)
+        weight = weight.repeat(1, src_len, 1)
+        rnn_input = torch.cat((x, weight), dim=-1)
+        rnn_input = self.att_combine(rnn_input)
+        output, hidden = self.dec(rnn_input, enc_hidden)
+        output = self.out(output)
+        
+        return output 
