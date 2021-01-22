@@ -39,6 +39,8 @@ os.mkdir(save_path)
 
 plt.figure(figsize=(50, 10))
 for sitename in sitenames:
+    if sitename not in ["南投", "士林", "埔里", "關山"]:
+        continue 
     print(f"sitename: {sitename}")
     origin_data = np.load(f"{origin_path}/{sitename}.npy")
     predict_data = np.load(f"{result_path}/{sitename}.npy")

@@ -46,9 +46,10 @@ if os.path.exists(cpt_dir):
     shutil.rmtree(cpt_dir)
 os.mkdir(cpt_dir) 
 
-if os.path.exists(f"{log_dir}/{no}"):
-    os.remove(f"{log_dir}/{no}")
-    with open(f"{log_dir}/{no}", "w", newline='') as fp:
+log_file = os.path.join(log_dir, f"{no}.csv")
+if os.path.exists(log_file):
+    os.remove(log_file)
+    with open(log_file, "w", newline='') as fp:
         writer = csv.DictWriter(fp, fieldnames=field)
         writer.writeheader()
 
@@ -66,10 +67,17 @@ for name in sitenames:
     train_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=True)
     valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=False)
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
 
-#    model = Model()
-    model = Seq2Seq(target_length=8)
+    model = Seq2Seq(
+                input_dim=15,
+                emb_dim=64,
+                output_dim=1,
+                hid_dim=64,
+                device=device,
+                dropout=0.6,
+                bidirectional=True,
+            )
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.MSELoss()
@@ -90,7 +98,7 @@ for name in sitenames:
             x = x.to(device) 
             y = y.to(device) 
             # get loss & update
-            o = model(x)
+            o = model(x, y)
             loss = update_model(criterion, optimizer, o, y)
             sum_loss += loss.item()
             trange.set_description(f"Training mean loss: {sum_loss / (idx+1):.4f}")
@@ -105,7 +113,7 @@ for name in sitenames:
             x = x.to(device) 
             y = y.to(device) 
             # get loss & update
-            o = model(x)
+            o = model.interface(x)
             loss = criterion(o, y)
             sum_loss += loss.item()
             trange.set_description(f"validing mean loss: {sum_loss / (idx+1):.4f}")
@@ -126,7 +134,7 @@ for name in sitenames:
                 print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.3f}")
                 os.rename("checkpoint.pt", os.path.join(cpt_dir, f"{sitename}.pt"))
                 # write log
-                with open(f"{log_dir}/{no}", "a", newline='') as fp:
+                with open(log_file, "a", newline='') as fp:
                     writer = csv.DictWriter(fp, fieldnames=field)
                     writer.writerow({
                         "sitename": sitename,

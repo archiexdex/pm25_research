@@ -61,8 +61,16 @@ for name in sitenames:
     std = std_dict[sitename][7]
 
     # Load model
-    model = SimpleRNN(target_length=8)
-    #model = Seq2Seq(target_length=8)
+    #model = SimpleRNN(target_length=8)
+    model = Seq2Seq(
+                input_dim=15,
+                emb_dim=32,
+                output_dim=1,
+                hid_dim=32,
+                device=device,
+                dropout=True,
+                bidirectional=True,
+            )
     checkpoint = torch.load(os.path.join(cpt_dir, f"{sitename}.pt"))
     model.load_state_dict(checkpoint) 
     model.to(device)
@@ -78,7 +86,7 @@ for name in sitenames:
         x = x.to(device) 
         y = y.to(device) 
         # get loss & update
-        o = model(x)
+        o = model.interface(x)
         loss = criterion(o, y)
         sum_loss += loss.item()
         # append result

@@ -10,7 +10,7 @@ def add_arguments(parser):
     parser.add_argument("--no",           type=int,                 help="the index of training process")
     parser.add_argument('--display_freq', type=int,   default=10,   help='display frequency for training')
     parser.add_argument('--gamma',        type=float, default=0.99, help='constant parameter')
-    parser.add_argument('--batch_size',   type=int,   default=512,  help='batch size')
+    parser.add_argument('--batch_size',   type=int,   default=128,  help='batch size')
 
 
     parser.add_argument('--origin_train_dir',       type=str,   default="dataset/origin/train",  help='')
