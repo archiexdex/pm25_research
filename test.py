@@ -1,3 +1,4 @@
+from utils import *
 from tqdm import tqdm
 import os, shutil 
 import numpy as np
@@ -14,14 +15,6 @@ from dataset.dataset import PMSingleSiteDataset
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load data
-def parse():
-    parser = argparse.ArgumentParser()
-    try: 
-        from argument import add_arguments 
-        parser = add_arguments(parser)
-    except:
-        pass 
-    return parser.parse_args()
 opt = parse()
 
 if opt.no is not None:
@@ -64,11 +57,11 @@ for name in sitenames:
     #model = SimpleRNN(target_length=8)
     model = Seq2Seq(
                 input_dim=15,
-                emb_dim=32,
+                emb_dim=64,
                 output_dim=1,
-                hid_dim=32,
+                hid_dim=64,
                 device=device,
-                dropout=True,
+                dropout=0.6,
                 bidirectional=True,
             )
     checkpoint = torch.load(os.path.join(cpt_dir, f"{sitename}.pt"))

@@ -80,14 +80,16 @@ def filter_data(data):
     data_day   = np.zeros((data.shape[0], 1))
     data_time  = np.zeros((data.shape[0], 1))
     data_month = np.zeros((data.shape[0], 1))
-    for i, d in enumerate(data['read_time'].apply(lambda x: x.weekday())):
+    for i, d in enumerate(data['read_time'].apply(lambda x: x.day)):
         data_day[i,] = d
     for i, d in enumerate(data['read_time'].apply(lambda x: x.hour)):
         data_time[i] = d
     for i, d in enumerate(data['read_time'].apply(lambda x: x.month)):
         data_month[i] = d-1
-    # Append time into data_features
-    data_features = np.concatenate((data_features, data_time, data_month), axis=-1)
+    # Create a buf for extreme event
+    data_ext = np.zeros((data.shape[0], 1)) + 1e-8
+    # Append time and extreme event buf into data_features
+    data_features = np.concatenate((data_features, data_month, data_day, data_time, data_ext), axis=-1)
     # Fetch site and hash
     sn_hash = dict(zip(sitenames_sorted, range(len(sitenames_sorted))))
     data_sn = np.zeros((data.shape[0], 1))
@@ -95,14 +97,19 @@ def filter_data(data):
         data_sn[i] = sn_hash[d]
     # Split data by sitename
     data_dict = sn_hash.copy()
-    data_features = data_features.reshape([-1, 73, 15])
+    data_features = data_features.reshape([-1, 73, 17])
     for i, key in enumerate(data_dict):
         data_dict[key] = data_features[:, i, :]
     return data_dict
 
 def get_normalize(data):
     """
-        data: dict, data[key] = [time, feature]
+        Input: 
+            data: dict, data[key] = [time, feature]
+        Output:
+            data: dict, data[key] = [time, feature]
+            mean_dict: dict, mean_dict[key] = [mean]
+            std_dict: dict, std_dict[key] = [std]
     """
     mean_dict = {}
     std_dict = {}
@@ -121,6 +128,16 @@ def put_normalize(data, mean_dict, std_dict):
         data[key] = (data[key] - mean) / std
     return data
 
+def label_extreme_event(data):
+    """
+        data: It's noralized data and it will append a new feature as whether it is extreme event 
+              by the standard variance.
+    """
+    for i, key in enumerate(data):
+        pivot = data[key][:, 7]
+        data[key][:, -1] = pivot > 2    
+    return data
+    
 def pm25_to_AQI(x):
     if x<15.5:
         AQI = 0
@@ -153,9 +170,13 @@ if __name__ == '__main__':
     # Normalize train_data_feature
     print("normalize feature")
     train_norm_data, train_mean, train_std = get_normalize(train_data_dict.copy())
-
     # Normalize valid_data by train
     valid_norm_data = put_normalize(valid_data_dict.copy(), train_mean, train_std)
+
+    print("Label extreme event")
+    # Label extreme data
+    label_extreme_event(train_norm_data)
+    label_extreme_event(valid_norm_data)
 
     # Save file
     print("Save file")

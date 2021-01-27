@@ -21,7 +21,7 @@ sitenames_sorted = sorted(sitenames)
 
 feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
-                'hour', 'month' 
+                'month', 'day', 'hour', 'ext event'
                 ]
 class PMSingleSiteDataset(Dataset):
     def __init__(self, sitename='美濃', target_hour=8, target_length=8, isTrain=False):
@@ -44,7 +44,7 @@ class PMSingleSiteDataset(Dataset):
             x: [batch, idx:idx+target_hour, features]
             y: [batch, idx+target_hour:idx+target_hour+target_length, 1]
             for default 
-                x: [batch, 8, 15]
+                x: [batch, 8, 17]
                 y: [batch, 8, 1]
         """
         # input, target 

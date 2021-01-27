@@ -1,3 +1,4 @@
+from utils import *
 from tqdm import tqdm
 import os, shutil 
 import numpy as np
@@ -12,21 +13,8 @@ from constants import *
 import csv 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# MARK: - Function
-def parse():
-    parser = argparse.ArgumentParser()
-    try: 
-        from argument import add_arguments 
-        parser = add_arguments(parser)
-    except:
-        pass 
-    return parser.parse_args()
-
-def check_folder(path, mode="f"):
-    if not os.path.exists(path):
-        os.mkdir(path)
 opt = parse()
+same_seeds(opt.seed)
 
 if opt.no is not None:
     no = opt.no 
@@ -67,7 +55,7 @@ for name in sitenames:
     train_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=True)
     valid_dataset = PMSingleSiteDataset(sitename=sitename, target_hour=8, target_length=8, isTrain=False)
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
+    valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)
 
     model = Seq2Seq(
                 input_dim=15,
@@ -80,7 +68,8 @@ for name in sitenames:
             )
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    criterion = nn.MSELoss()
+    mse = nn.MSELoss()
+    bce = nn.BCEWithLogitsLoss(pos_weight=opt.pos_weight)
 
     max_epochs = 100
     best_loss = 1e9
@@ -94,11 +83,12 @@ for name in sitenames:
         trange = tqdm(train_dataloader)
         for idx, data in enumerate(trange):
             # get data
-            x, y = data 
+            x, y, ext = data 
             x = x.to(device) 
-            y = y.to(device) 
+            y = y.to(device)
+            ext = ext.to(device)
             # get loss & update
-            o = model(x, y)
+            o = model(x, y, ext)
             loss = update_model(criterion, optimizer, o, y)
             sum_loss += loss.item()
             trange.set_description(f"Training mean loss: {sum_loss / (idx+1):.4f}")
