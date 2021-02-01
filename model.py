@@ -5,54 +5,65 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Model(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim, emb_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=False):
         super().__init__()
-        self.rnn = nn.GRU(32, 32, batch_first=True)
-        self.dense_all = nn.Linear(15, 32)
-        self.dense_w = nn.Linear(5, 32)
-        self.dense_f = nn.Linear(8, 32)
-        self.dense_t = nn.Linear(2, 32)
-        self.out_w = nn.Linear(32, 1)
-        self.out_b = nn.Linear(32, 1)
 
-    def forward(self, x):
-        x_f = self.dense_f(x[:, :, :8])
-        x_w = self.dense_w(x[:, :, 8:8+5])
-        x_t = self.dense_t(x[:, :, 13:])
-        #x = self.dense_all(x)
-        latent, hidden = self.rnn(x_f*x_t + x_w*x_t)
-        out_w = self.out_w(latent[:, -1])
-        out_b = self.out_b(latent[:, -1])
-        output = out_w + out_b 
-        return output 
+        self.bidirectional = bidirectional
+        self.emb = nn.Linear(input_dim, emb_dim)
+        self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True, bidirectional=bidirectional)
+        self.dropout = nn.Dropout(dropout)
+        self.hidden_fc = nn.Linear(hid_dim, hid_dim)
+        self.out_fc = nn.Linear(hid_dim, 1)
+        self.bias_fc = nn.Linear(1, 1)
+        self.window_fc = nn.Linear(hid_dim, 1)
+        self.softmax = nn.Softmax(dim=-1)
+        self.device = device
 
-class SimpleDNN(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.dense = nn.Linear(15, 32)
-        self.out_w = nn.Linear(32, 1)
-        self.out_b = nn.Linear(32, 1)
+    def forward(self, x, past_window, past_ext):
+        
+        # past window
+        history_window = []
+        for i in range(past_window.shape[1]):
+            embed = self.emb(past_window[:, i])
+            embed = self.dropout(embed)
+            _, hidden = self.rnn(embed)
+            hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
+            hidden = self.hidden_fc(hidden)
+            hidden = hidden.unsqueeze(1)
+            # hidden: [batch, 1, hid_dim]
+            history_window.append(hidden)
+        window_indicator = torch.cat([window for window in history_window], 1)
+        # window_indicator: [batch, memory_size, hid_dim]
+        #print("window_indicator shape: ", window_indicator.shape)
 
-    def forward(self, x):
-        x = self.dense(x)
-        out_w = self.out_w(x)
-        out_b = self.out_b(x)
-        output = out_w + out_b 
-        return output 
+        # Create a pool to put the predict value
+        batch_size, trg_len, _ = x.shape
+        embed = self.emb(x)
+        embed = self.dropout(embed)
+        latent, hidden = self.rnn(embed)
+        hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
+        hidden = self.hidden_fc(hidden)
+        hidden = hidden.unsqueeze(1)
+        # hidden: [batch, 1, hid_dim]
+        #print("hidden shape: ", hidden.shape)
 
-class SimpleRNN(nn.Module):
-    def __init__(self, target_length):
-        super().__init__()
-        self.rnn = nn.GRU(32, 32, batch_first=True)
-        self.dense_all = nn.Linear(15, 32)
-        self.out = nn.Linear(32, 1)
-        self.target_length = target_length 
-
-    def forward(self, x):
-        x = self.dense_all(x)
-        latent, hidden = self.rnn(x)
-        output = self.out(latent[:, -self.target_length:])
-        return output 
+        # attention with window
+        alpha = [torch.bmm(hidden, window.reshape(-1, window_indicator.shape[-1], 1)) for window in history_window]
+        alpha = torch.cat(alpha, 1)
+        alpha = self.softmax(alpha)
+        #print("alpha shape:", alpha.shape)
+        # alpha: [batch, window_len, 1]
+        indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
+        #print(indicator_output.shape)
+        # indicator_output: [batch, 1, 1]
+        output = self.out_fc(latent)
+        bias = self.bias_fc(indicator_output)
+        output = output + bias
+        window_indicator = self.window_fc(window_indicator)
+        # window_indicator: [batch, memory_size, 1]
+        # indicator_output: [batch, 1, 1]
+        # output: [batch, 1, 1]
+        return window_indicator, indicator_output, output
 
 class Encoder(nn.Module):
     def __init__(self, input_dim, emb_dim, output_dim, hid_dim, dropout=0.6, bidirectional=True):
@@ -65,7 +76,6 @@ class Encoder(nn.Module):
         self.enc_fc = nn.Linear(hid_dim * 2, hid_dim) if bidirectional else nn.Linear(hid_dim, hid_dim)
 
     def forward(self, x):
-        
         embed = self.emb(x)
         embed = self.dropout(embed)
         latent, hidden = self.enc(embed)
@@ -125,14 +135,12 @@ class Decoder(nn.Module):
 class Seq2Seq(nn.Module):
     def __init__(self, input_dim, emb_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=True):
         super().__init__()
-        
         self.device = device 
         self.encoder = Encoder(input_dim, emb_dim, output_dim, hid_dim, dropout, bidirectional)
         attention = Attention(hid_dim, bidirectional)
         self.decoder = Decoder(output_dim, emb_dim, output_dim, hid_dim, attention, dropout, bidirectional)
 
     def forward(self, x, y, teacher_force_ratio=0.6):
-        
         batch_size = y.shape[0]
         trg_len    = y.shape[1]
         trg_dim    = y.shape[2]
@@ -153,7 +161,6 @@ class Seq2Seq(nn.Module):
         return outputs
 
     def interface(self, x):
-        
         batch_size = x.shape[0]
         trg_len    = x.shape[1]
         trg_dim    = 1
@@ -172,5 +179,17 @@ class Seq2Seq(nn.Module):
             trg = output[:, 0]
         
         return outputs
-    
 
+class SimpleRNN(nn.Module):
+    def __init__(self, target_length):
+        super().__init__()
+        self.rnn = nn.GRU(32, 32, batch_first=True)
+        self.dense_all = nn.Linear(15, 32)
+        self.out = nn.Linear(32, 1)
+        self.target_length = target_length 
+
+    def forward(self, x):
+        x = self.dense_all(x)
+        latent, hidden = self.rnn(x)
+        output = self.out(latent[:, -self.target_length:])
+        return output 

@@ -5,6 +5,7 @@ import numpy as np
 import random
 import json
 import os, shutil
+import warnings
 
 # size of 73
 sitenames = [
@@ -21,37 +22,72 @@ sitenames_sorted = sorted(sitenames)
 
 feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
-                'month', 'day', 'hour', 'ext event'
+                'month', 'day', 'hour'
                 ]
 class PMSingleSiteDataset(Dataset):
-    def __init__(self, sitename='美濃', target_hour=8, target_length=8, isTrain=False):
+    def __init__(self, config, sitename, isTrain=False):
         
-        filename = f"dataset/norm/train/{sitename}.npy" if isTrain else f"dataset/norm/valid/{sitename}.npy"
+        filename = f"dataset/origin/train/{sitename}.npy" if isTrain else f"dataset/origin/valid/{sitename}.npy"
         if os.path.exists(filename):
             self.data = np.load(filename) 
         else:
             raise ValueError(f"path {filename} doesn't exist")
 
-        self.target_hour = target_hour 
-        self.sz = len(self.data) - target_hour - target_length  
-        self.target_length = target_length 
+        self.memory_size = config.memory_size
+        self.window_size = config.window_size
+        self.target_size = config.target_size
+        self.threshold = config.threshold
+        self.size = len(self.data) - self.memory_size - self.window_size - self.target_size 
+        self.mean = {}
+        self.std = {}
+        with open(config.mean_path, "r") as fp:
+            self.mean = json.load(fp)[sitename]
+        with open(config.std_path, "r") as fp:
+            self.std = json.load(fp)[sitename]
+        #print(self.data[self.memory_size+self.window_size+self.target_size, -3:])
+        #input("!@#")
+        # Normalize data
+        self.data_copy = self.data.copy()
+        self.data = (self.data - self.mean) / self.std
+        
+        self.threshold = ( self.threshold - self.mean[7]) / self.std[7]
+        # Create past window input & past extreme event label
+        self.all_window = np.zeros([self.size+self.memory_size, self.window_size, 16])
+        self.all_ext    = np.zeros([self.size+self.memory_size, 1])
+        for j in range(self.all_window.shape[0]):
+            self.all_window[j] = self.data[j: j+self.window_size]
+            self.all_ext[j]    = self.data[j+self.window_size: j+self.window_size+1, 7:8] > self.threshold
 
     def __len__(self):
-        return self.sz 
+        return self.size
 
     def __getitem__(self, idx):
         """
-            x: [batch, idx:idx+target_hour, features]
-            y: [batch, idx+target_hour:idx+target_hour+target_length, 1]
-            for default 
-                x: [batch, 8, 17]
-                y: [batch, 8, 1]
+            past_window: [batch, window_size, window_len, 16]
+            past_ext: [batch, window_size, 1]
+            x: [batch, target_len, 16]
+            y: [batch, target_len, 1]
+            y_ext: [batch, target_len, 1]
         """
-        # input, target 
-        x = FloatTensor(self.data[idx:idx+self.target_hour])
-        # Only predict pm2.5, so select '7:8'
-        y = FloatTensor(self.data[idx+self.target_hour:idx+self.target_hour+self.target_length, 7:8])
-        return x, y 
+        # Past window, each window has a sequence of data
+        st = idx
+        ed = idx + self.memory_size 
+        past_window = self.all_window[st: ed]
+        past_ext = self.all_ext[st: ed]
         
-#    def collate_fn(insts):
-#        pass
+        # Input
+        st = idx + self.memory_size + self.window_size
+        ed = idx + self.memory_size + self.window_size + self.target_size
+        x = self.data[st: ed]
+        # Target, only predict pm2.5, so select '7:8'
+        st = idx + self.memory_size + self.window_size + self.target_size
+        ed = idx + self.memory_size + self.window_size + self.target_size + 1
+        y = self.data[st: ed, 7:8]
+        y_ext = y > self.threshold
+
+        return  torch.FloatTensor(x),\
+                torch.FloatTensor(y),\
+                torch.FloatTensor(y_ext),\
+                torch.FloatTensor(past_window),\
+                torch.FloatTensor(past_ext)
+        
