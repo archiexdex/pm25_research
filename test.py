@@ -92,6 +92,8 @@ for name in sitenames:
         # append result
         #predict_result.append(predict_o)
         predict_result = np.concatenate((predict_result, predict_o), axis=None)
+        print(predict_result.shape , predict_o.shape)
+        input("!@#")
         trange.set_description(f"testing mean loss: {sum_loss / (idx+1):.4f}")
 
     valid_loss = sum_loss / len(valid_dataloader) 

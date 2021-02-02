@@ -35,28 +35,32 @@ class PMSingleSiteDataset(Dataset):
 
         self.memory_size = config.memory_size
         self.window_size = config.window_size
+        self.source_size = config.source_size
         self.target_size = config.target_size
         self.threshold = config.threshold
-        self.size = len(self.data) - self.memory_size - self.window_size - self.target_size 
+        self.shuffle = config.shuffle
+        self.size = len(self.data) - self.memory_size - self.window_size - self.source_size - self.target_size 
         self.mean = {}
         self.std = {}
         with open(config.mean_path, "r") as fp:
             self.mean = json.load(fp)[sitename]
         with open(config.std_path, "r") as fp:
             self.std = json.load(fp)[sitename]
-        #print(self.data[self.memory_size+self.window_size+self.target_size, -3:])
-        #input("!@#")
         # Normalize data
         self.data_copy = self.data.copy()
+        #print(self.data[self.memory_size + self.window_size + self.source_size + self.target_size - 1, -3:])
+        #input("!@#")
         self.data = (self.data - self.mean) / self.std
         
         self.threshold = ( self.threshold - self.mean[7]) / self.std[7]
         # Create past window input & past extreme event label
         self.all_window = np.zeros([self.size+self.memory_size, self.window_size, 16])
-        self.all_ext    = np.zeros([self.size+self.memory_size, 1])
+        self.all_ext    = np.zeros([self.size+self.memory_size, self.target_size, 1])
         for j in range(self.all_window.shape[0]):
             self.all_window[j] = self.data[j: j+self.window_size]
-            self.all_ext[j]    = self.data[j+self.window_size: j+self.window_size+1, 7:8] > self.threshold
+            st = j + self.window_size
+            ed = j + self.window_size + self.target_size 
+            self.all_ext[j]    = self.data[st: ed, 7:8] > self.threshold
 
     def __len__(self):
         return self.size
@@ -74,14 +78,20 @@ class PMSingleSiteDataset(Dataset):
         ed = idx + self.memory_size 
         past_window = self.all_window[st: ed]
         past_ext = self.all_ext[st: ed]
+        # shuffle window
+        indexs = np.arange(self.memory_size)
+        if self.shuffle:
+            np.random.shuffle(indexs)
+            past_window = past_window[indexs]
+            past_ext = past_ext[indexs]
         
         # Input
         st = idx + self.memory_size + self.window_size
-        ed = idx + self.memory_size + self.window_size + self.target_size
+        ed = idx + self.memory_size + self.window_size + self.source_size
         x = self.data[st: ed]
         # Target, only predict pm2.5, so select '7:8'
-        st = idx + self.memory_size + self.window_size + self.target_size
-        ed = idx + self.memory_size + self.window_size + self.target_size + 1
+        st = idx + self.memory_size + self.window_size + self.source_size
+        ed = idx + self.memory_size + self.window_size + self.source_size + self.target_size
         y = self.data[st: ed, 7:8]
         y_ext = y > self.threshold
 
