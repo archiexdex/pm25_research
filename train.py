@@ -43,7 +43,7 @@ def update_model(loss_function, optimizer, output, target, retain_graph=False):
 ############ train model #############
 for name in sitenames:
     sitename = name 
-    if sitename not in ["南投", "士林", "埔里", "關山"]:
+    if opt.skip_site and sitename not in ["湖口", "林園", "南投", "士林", "埔里", "關山"]:
         continue 
     print(sitename)
     train_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=True)
@@ -52,7 +52,7 @@ for name in sitenames:
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
 
     if model_name == "fudan":
-        model = Model(
+        model = Fudan(
                     input_dim=opt.input_dim,
                     emb_dim=opt.emb_dim,
                     output_dim=opt.output_dim,
@@ -97,13 +97,10 @@ for name in sitenames:
                 #print("output shape: ", window_indicator.shape, indicator_output.shape, prediction.shape)
                 #print("label shape: ", past_ext.shape, y_ext.shape, y.shape)
                 # Calculate loss
-                #past_ext_loss   =  update_model(bce, optimizer, window_indicator, past_ext, True)
-                #target_ext_loss = update_model(bce, optimizer, indicator_output, y_ext, True)
-                #prediction_loss = update_model(mse, optimizer, prediction, y)
-                #past_ext_loss = bce(window_indicator, past_ext)
+                past_ext_loss = bce(window_indicator, past_ext)
                 target_ext_loss = bce(indicator_output, y_ext)
                 prediction_loss = mse(prediction, y)
-                loss = target_ext_loss + prediction_loss# + past_ext_loss
+                loss = target_ext_loss + prediction_loss + past_ext_loss
             elif model_name == "seq2seq":
                 prediction = model(x, y)
                 # Calculate loss
@@ -115,7 +112,7 @@ for name in sitenames:
             optimizer.step()
             # Record loss
             if model_name == "fudan":
-                #mean_past_ext_loss += past_ext_loss.item()
+                mean_past_ext_loss += past_ext_loss.item()
                 mean_target_ext_loss += target_ext_loss.item()
             mean_prediction_loss += prediction_loss.item()
             trange.set_description(f"Training mean loss past_ext: {mean_past_ext_loss / (idx+1):.3e}, target_ext: {mean_target_ext_loss / (idx+1):.4f}, prediction: {mean_prediction_loss / (idx+1):.3e}")
@@ -129,7 +126,7 @@ for name in sitenames:
             x, y, y_ext, past_window, past_ext = map(lambda x: x.to(device), data)
             # get loss & update
             if model_name == "fudan":
-                _, _, prediction = model(x, past_window, past_ext)
+                _, y_pred, prediction = model(x, past_window, past_ext)
             elif model_name == "seq2seq":
                 prediction = model.interface(x)
             # Calculate loss

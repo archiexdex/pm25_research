@@ -17,11 +17,12 @@ def add_arguments(parser):
     parser.add_argument('--lr',              type=float,  default=1e-3,  help='')
     parser.add_argument('--total_epoch',   type=int,   default=100,  help='')
     parser.add_argument('--patience',     type=int,   default=3,    help='')
+    parser.add_argument('--skip_site',   type=bool,  default=True,  help='')
 
     parser.add_argument('--memory_size',  type=int,   default=80,  help='')
     parser.add_argument('--window_size',   type=int,   default=8,   help='')
     parser.add_argument('--source_size',   type=int,   default=8,   help='')
-    parser.add_argument('--target_size',   type=int,   default=8,   help='')
+    parser.add_argument('--target_size',   type=int,   default=1,   help='')
     parser.add_argument('--threshold',    type=int,   default=70,  help='')
     parser.add_argument('--shuffle',    type=bool,   default=True,  help='')
 
@@ -39,6 +40,7 @@ def add_arguments(parser):
     parser.add_argument('--origin_valid_dir',       type=str,   default="dataset/origin/valid",  help='')
     parser.add_argument('--mean_path',       type=str,   default="dataset/train_mean.json",  help='')
     parser.add_argument('--std_path',        type=str,   default="dataset/train_std.json",  help='')
+    parser.add_argument('--threshold_path',        type=str,   default="dataset/train_threshold.json",  help='')
     parser.add_argument('--cpt_dir',                type=str,   default="checkpoints",           help='')
     parser.add_argument('--log_dir',                type=str,   default="logs",                  help='')
     parser.add_argument('--test_results_dir',       type=str,   default="test_results",          help='')

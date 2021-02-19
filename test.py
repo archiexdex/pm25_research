@@ -43,13 +43,13 @@ for name in sitenames:
     print(f"sitename: {name}")
     valid_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=False)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
-
+    
     mean = mean_dict[sitename][7]
     std = std_dict[sitename][7]
 
     # Load model
     if model_name == "fudan":
-        model = Model(
+        model = Fudan(
                     input_dim=opt.input_dim,
                     emb_dim=opt.emb_dim,
                     output_dim=opt.output_dim,
@@ -73,7 +73,9 @@ for name in sitenames:
     model.to(device)
     criterion = nn.MSELoss()
 
-    predict_result = np.array([])
+    predict_list = None 
+    true_list = None
+    pred_list = None
     sum_loss = 0
     model.eval()
     trange = tqdm(valid_dataloader)
@@ -82,21 +84,33 @@ for name in sitenames:
         x, y, y_ext, past_window, past_ext = map(lambda z: z.to(device), data)
         # get loss & update
         if model_name == "fudan":
-            _, _, output = model(x, past_window, past_ext)
+            _, y_pred, output = model(x, past_window, past_ext)
         elif model_name == "seq2seq":
             output = model.interface(x)
         loss = criterion(output, y)
         sum_loss += loss.item()
         # Denorm the data
-        predict_o = output.cpu().detach().numpy() * std + mean 
+        output = output.cpu().detach().numpy() * std + mean 
+        y_pred = y_pred.cpu().detach().numpy() * std + mean 
+        y_ext = y_ext.cpu().numpy()
+        y_pred[y_pred>0.5] = 1
+        y_pred[y_pred<=0.5] = 0
         # append result
-        #predict_result.append(predict_o)
-        predict_result = np.concatenate((predict_result, predict_o), axis=None)
-        print(predict_result.shape , predict_o.shape)
-        input("!@#")
+        if predict_list is None:
+            predict_list = output
+            true_list = y_ext
+            pred_list = y_pred
+        else:
+            predict_list = np.concatenate((predict_list, output), axis=0)
+            true_list   = np.concatenate((true_list, y_ext), axis=0)
+            pred_list   = np.concatenate((pred_list, y_pred), axis=0)
         trange.set_description(f"testing mean loss: {sum_loss / (idx+1):.4f}")
-
+    # summery value
     valid_loss = sum_loss / len(valid_dataloader) 
+    true_list = np.squeeze(true_list)
+    pred_list = np.squeeze(pred_list)
+    f1, macro, micro, weighted = get_score(true_list, pred_list)
+    print(f"f1: {f1}, macro: {macro}, micro: {micro}, weighted: {weighted}")
         
     # Save results
-    np.save(f"{save_dir}/{sitename}.npy", predict_result)
+    np.save(f"{save_dir}/{sitename}.npy", predict_list)

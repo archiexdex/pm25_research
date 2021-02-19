@@ -5,6 +5,7 @@ import argparse
 from argparse import Namespace
 import json
 import torch
+from sklearn.metrics import f1_score, precision_score
 torch.autograd.set_detect_anomaly(True)
 
 def same_seeds(seed):
@@ -42,3 +43,10 @@ def save_config(config, path, no):
     config = vars(config)
     with open(path, 'w') as fp:
         json.dump(config, fp, ensure_ascii=False, indent=4)
+
+def get_score(y_true, y_pred):
+    f1       = f1_score(y_true, y_pred)
+    macro    = f1_score(y_true, y_pred, average='macro')
+    micro    = f1_score(y_true, y_pred, average='micro')
+    weighted = f1_score(y_true, y_pred, average='weighted')
+    return f1, macro, micro, weighted

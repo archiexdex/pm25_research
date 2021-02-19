@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 
-class Model(nn.Module):
+class Fudan(nn.Module):
     def __init__(self, input_dim, emb_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=False):
         super().__init__()
 
@@ -19,42 +19,41 @@ class Model(nn.Module):
         self.device = device
 
     def forward(self, x, past_window, past_ext):
+        # Create a pool to put the predict value
+        #batch_size, trg_len, _ = x.shape
+        #outputs = torch.zeros(batch_size, trg_len, 1).to(self.device)
+        #indicator_outputs = torch.zeros(batch_size, trg_len, 1).to(self.device)
+        #hidden = torch.zeros(1, batch_size, history_window[0].shape[-1]).to(self.device)
+        #for i in range(trg_len):
+        #embed = self.emb(x[:, i:i+1])
+        embed = self.emb(x)
+        embed = self.dropout(embed)
+        latent, hidden = self.rnn(embed)
+        #print("latent shape: ", latent.shape)
+        #print("hidden shape: ", hidden.shape)
+        #hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
+        # hidden: [1, batch, hid_dim]
+        #print("hidden shape: ", hidden.shape)
+        
         # Get history window code
         history_window, window_indicator = self.get_window(past_window)
-        # Create a pool to put the predict value
-        batch_size, trg_len, _ = x.shape
-        outputs = torch.zeros(batch_size, trg_len, 1).to(self.device)
-        indicator_outputs = torch.zeros(batch_size, trg_len, 1).to(self.device)
-        hidden = torch.zeros(1, batch_size, history_window[0].shape[-1]).to(self.device)
-        for i in range(trg_len):
-            embed = self.emb(x[:, i:i+1])
-            embed = self.dropout(embed)
-            latent, hidden = self.rnn(embed, hidden)
-            #print("latent shape: ", latent.shape)
-            #print("hidden shape: ", hidden.shape)
-            #hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
-            # hidden: [1, batch, hid_dim]
-            #print("hidden shape: ", hidden.shape)
-            
-            # attention with window
-            alpha = [torch.bmm(hidden.reshape(-1, 1, hidden.shape[-1]), window.reshape(-1, hidden.shape[-1], 1)) for window in history_window]
-            alpha = torch.cat(alpha, 1)
-            alpha = self.softmax(alpha)
-            #print("alpha shape: ", alpha.shape)
-            # alpha: [batch, window_len, 1]
-            indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext[:, :, i])
-            #print("indicator_output shape: ", indicator_output.shape)
-            # indicator_output: [batch, 1, 1]
-            #output = self.out_fc(latent[:, -1])
-            output = self.out_fc(latent)
-            bias = self.bias_fc(indicator_output)
-            output = output + bias
-            outputs[:, i] = output[0]
-            indicator_outputs[i] = indicator_output[0]
-        # window_indicator: [batch, memory_size, 1]
+        # attention with window
+        alpha = [torch.bmm(hidden.reshape(-1, 1, hidden.shape[-1]), window.reshape(-1, hidden.shape[-1], 1)) for window in history_window]
+        alpha = torch.cat(alpha, 1)
+        alpha = self.softmax(alpha)
+        #print("alpha shape: ", alpha.shape)
+        # alpha: [batch, window_len, 1]
+        indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
+        #print("indicator_output shape: ", indicator_output.shape)
         # indicator_output: [batch, 1, 1]
-        # output: [batch, 1, 1]
-        return window_indicator, indicator_outputs, outputs
+        #output = self.out_fc(latent[:, -1])
+        output = self.out_fc(latent[:, -1:])
+        bias = self.bias_fc(indicator_output)
+        output = output + bias
+        # window_indicator: [batch, memory_size, 1]
+        # indicator_outputs: [batch, 1, 1]
+        # outputs: [batch, 1, 1]
+        return window_indicator, indicator_output, output
     
     def get_window(self, past_window):
         # past window

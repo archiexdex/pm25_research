@@ -5,7 +5,7 @@ import numpy as np
 import random
 import json
 import os, shutil
-import warnings
+from lmoments3 import distr
 
 # size of 73
 sitenames = [
@@ -39,28 +39,38 @@ class PMSingleSiteDataset(Dataset):
         self.target_size = config.target_size
         self.threshold = config.threshold
         self.shuffle = config.shuffle
-        self.size = len(self.data) - self.memory_size - self.window_size - self.source_size - self.target_size 
+        self.size = len(self.data) - self.memory_size - self.window_size - self.source_size - self.target_size + 1
         self.mean = {}
         self.std = {}
+        self.threshold = {}
         with open(config.mean_path, "r") as fp:
             self.mean = json.load(fp)[sitename]
         with open(config.std_path, "r") as fp:
             self.std = json.load(fp)[sitename]
+        with open(config.threshold_path, "r") as fp:
+            self.threshold = json.load(fp)[sitename]
         # Normalize data
         self.data_copy = self.data.copy()
-        #print(self.data[self.memory_size + self.window_size + self.source_size + self.target_size - 1, -3:])
-        #input("!@#")
+        # summer
+        self.s_index = np.isin(self.data[:, -3], [4,5,6,7,8,9])
+        # winter
+        self.w_index = np.isin(self.data[:, -3], [4,5,6,7,8,9], invert=True)
         self.data = (self.data - self.mean) / self.std
         
-        self.threshold = ( self.threshold - self.mean[7]) / self.std[7]
+        self.s_threshold = ( self.threshold["summer"] - self.mean[7]) / self.std[7]
+        self.w_threshold = ( self.threshold["winter"] - self.mean[7]) / self.std[7]
         # Create past window input & past extreme event label
         self.all_window = np.zeros([self.size+self.memory_size, self.window_size, 16])
-        self.all_ext    = np.zeros([self.size+self.memory_size, self.target_size, 1])
+        self.all_ext    = np.zeros([self.size+self.memory_size, 1])
         for j in range(self.all_window.shape[0]):
             self.all_window[j] = self.data[j: j+self.window_size]
-            st = j + self.window_size
-            ed = j + self.window_size + self.target_size 
-            self.all_ext[j]    = self.data[st: ed, 7:8] > self.threshold
+            st = j + self.window_size + self.target_size - 1
+            ed = j + self.window_size + self.target_size
+            if st in self.s_index:
+                threshold = self.s_threshold
+            else:
+                threshold = self.w_threshold
+            self.all_ext[j] = self.data[st: ed, 7:8] > threshold
 
     def __len__(self):
         return self.size
@@ -90,14 +100,25 @@ class PMSingleSiteDataset(Dataset):
         ed = idx + self.memory_size + self.window_size + self.source_size
         x = self.data[st: ed]
         # Target, only predict pm2.5, so select '7:8'
-        st = idx + self.memory_size + self.window_size + self.source_size
+        st = idx + self.memory_size + self.window_size + self.source_size + self.target_size - 1
         ed = idx + self.memory_size + self.window_size + self.source_size + self.target_size
         y = self.data[st: ed, 7:8]
-        y_ext = y > self.threshold
+        if st in self.s_index:
+            threshold = self.s_threshold
+        else:
+            threshold = self.w_threshold
+        y_ext = y > threshold
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\
                 torch.FloatTensor(y_ext),\
                 torch.FloatTensor(past_window),\
                 torch.FloatTensor(past_ext)
-        
+    
+    def get_gev_params(self):
+        x = self.data[:, 7]
+        params = distr.gev.lmom_fit(x)
+        mean = params['loc']
+        std = params['scale']
+        shape = params['c']
+        return mean, std, shape

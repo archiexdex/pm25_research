@@ -85,7 +85,7 @@ def filter_data(data):
     for i, d in enumerate(data['read_time'].apply(lambda x: x.hour)):
         data_time[i] = d
     for i, d in enumerate(data['read_time'].apply(lambda x: x.month)):
-        data_month[i] = d-1
+        data_month[i] = d
     # Append time and extreme event buf into data_features
     data_features = np.concatenate((data_features, data_month, data_day, data_time), axis=-1)
     # Fetch site and hash
@@ -111,13 +111,28 @@ def get_normalize(data):
     """
     mean_dict = {}
     std_dict = {}
+    threshold_dict = {}
+    ratio = 2
     for i, key in enumerate(data):
-        mean = data[key].mean(axis=0)
-        std  = data[key].std(axis=0)
+        _data = data[key]
+        # summer
+        s_index = np.isin(_data[:, -3], [4,5,6,7,8,9])
+        s_mean  = _data[s_index, 7].mean()
+        s_std   = _data[s_index, 7].std()
+        s_threshold = s_mean + s_std * ratio
+        # winter
+        w_index = np.isin(_data[:, -3], [4,5,6,7,8,9], invert=True)
+        w_mean  = _data[w_index, 7].mean()
+        w_std   = _data[w_index, 7].std()
+        w_threshold = w_mean + w_std * ratio
+        # global
+        mean = _data.mean(axis=0)
+        std  = _data.std(axis=0)
         mean_dict[key] = mean.tolist()
         std_dict[key] = std.tolist()
+        threshold_dict[key] = {"winter": w_threshold, "summer": s_threshold}
         data[key] = (data[key] - mean) / std 
-    return data, mean_dict, std_dict
+    return data, mean_dict, std_dict, threshold_dict 
 
 def put_normalize(data, mean_dict, std_dict):
     for i, key in enumerate(data):
@@ -157,7 +172,7 @@ if __name__ == '__main__':
 
     # Normalize train_data_feature
     print("normalize feature")
-    train_norm_data, train_mean, train_std = get_normalize(train_data_dict.copy())
+    train_norm_data, train_mean, train_std, train_threshold = get_normalize(train_data_dict.copy())
     # Normalize valid_data by train
     valid_norm_data = put_normalize(valid_data_dict.copy(), train_mean, train_std)
 
@@ -167,6 +182,8 @@ if __name__ == '__main__':
         json.dump(train_mean, fp, ensure_ascii=False, indent=4)
     with open("train_std.json", "w") as fp:
         json.dump(train_std,  fp, ensure_ascii=False, indent=4)
+    with open("train_threshold.json", "w") as fp:
+        json.dump(train_threshold,  fp, ensure_ascii=False, indent=4)
     
     # check whether the folder exists
     try:
