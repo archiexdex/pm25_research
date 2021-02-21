@@ -112,7 +112,7 @@ def get_normalize(data):
     mean_dict = {}
     std_dict = {}
     threshold_dict = {}
-    ratio = 2
+    ratio = 1.5
     for i, key in enumerate(data):
         _data = data[key]
         # summer

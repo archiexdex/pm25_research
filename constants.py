@@ -21,3 +21,5 @@ field = [
     "epoch",
     "timestamp"
 ]
+
+sample_sites = ["湖口", "林園", "南投", "士林", "埔里", "關山"]

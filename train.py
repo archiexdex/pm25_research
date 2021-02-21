@@ -43,7 +43,7 @@ def update_model(loss_function, optimizer, output, target, retain_graph=False):
 ############ train model #############
 for name in sitenames:
     sitename = name 
-    if opt.skip_site and sitename not in ["湖口", "林園", "南投", "士林", "埔里", "關山"]:
+    if opt.skip_site and sitename not in sample_sites:
         continue 
     print(sitename)
     train_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=True)
@@ -90,7 +90,7 @@ for name in sitenames:
         trange = tqdm(train_dataloader)
         for idx, data in enumerate(trange):
             # get data
-            x, y, y_ext, past_window, past_ext = map(lambda z: z.to(device), data)
+            x, y, y_ext, past_window, past_ext, _ = map(lambda z: z.to(device), data)
             # get loss & update
             if model_name == "fudan":
                 window_indicator, indicator_output, prediction = model(x, past_window, past_ext)
@@ -102,10 +102,11 @@ for name in sitenames:
                 prediction_loss = mse(prediction, y)
                 loss = target_ext_loss + prediction_loss + past_ext_loss
             elif model_name == "seq2seq":
-                prediction = model(x, y)
+                prediction, y_pred = model(x, past_window, past_ext)
                 # Calculate loss
                 prediction_loss = mse(prediction, y)
-                loss = prediction_loss
+                target_ext_loss = bce(y_pred, y_ext)
+                loss = prediction_loss + target_ext_loss
             # Update model
             optimizer.zero_grad()
             loss.backward()
@@ -113,7 +114,7 @@ for name in sitenames:
             # Record loss
             if model_name == "fudan":
                 mean_past_ext_loss += past_ext_loss.item()
-                mean_target_ext_loss += target_ext_loss.item()
+            mean_target_ext_loss += target_ext_loss.item()
             mean_prediction_loss += prediction_loss.item()
             trange.set_description(f"Training mean loss past_ext: {mean_past_ext_loss / (idx+1):.3e}, target_ext: {mean_target_ext_loss / (idx+1):.4f}, prediction: {mean_prediction_loss / (idx+1):.3e}")
         train_loss = mean_prediction_loss / len(train_dataloader)
@@ -123,12 +124,12 @@ for name in sitenames:
         trange = tqdm(valid_dataloader)
         for idx, data in enumerate(trange):
             # get data
-            x, y, y_ext, past_window, past_ext = map(lambda x: x.to(device), data)
+            x, y, y_ext, past_window, past_ext, _ = map(lambda x: x.to(device), data)
             # get loss & update
             if model_name == "fudan":
                 _, y_pred, prediction = model(x, past_window, past_ext)
             elif model_name == "seq2seq":
-                prediction = model.interface(x)
+                prediction, y_pred = model(x, past_window, past_ext)
             # Calculate loss
             prediction_loss = mse(prediction, y)
             # Record loss

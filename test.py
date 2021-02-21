@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from constants import * 
 from model import * 
 from dataset.dataset import PMSingleSiteDataset 
+import pandas as pd
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 opt = parse()
@@ -36,9 +37,11 @@ with open("dataset/train_mean.json", "r") as fp:
 with open("dataset/train_std.json", "r") as fp:
     std_dict = json.load(fp)
 
+name_list = []
+data_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
 for name in sitenames:
     sitename = name 
-    if sitename not in ["南投", "士林", "埔里", "關山"]:
+    if sitename not in sample_sites:
         continue 
     print(f"sitename: {name}")
     valid_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=False)
@@ -81,20 +84,23 @@ for name in sitenames:
     trange = tqdm(valid_dataloader)
     for idx, data in enumerate(trange):
         # get data
-        x, y, y_ext, past_window, past_ext = map(lambda z: z.to(device), data)
+        x, y, y_ext, past_window, past_ext, y_thres = map(lambda z: z.to(device), data)
         # get loss & update
         if model_name == "fudan":
             _, y_pred, output = model(x, past_window, past_ext)
         elif model_name == "seq2seq":
-            output = model.interface(x)
+            output, y_pred = model(x, past_window, past_ext)
         loss = criterion(output, y)
         sum_loss += loss.item()
         # Denorm the data
+        x = x.cpu().numpy() * std + mean
+        y = y.cpu().numpy() * std + mean
         output = output.cpu().detach().numpy() * std + mean 
-        y_pred = y_pred.cpu().detach().numpy() * std + mean 
+        y_pred = y_pred.cpu().detach().numpy() 
         y_ext = y_ext.cpu().numpy()
-        y_pred[y_pred>0.5] = 1
-        y_pred[y_pred<=0.5] = 0
+        y_thres = y_thres.cpu().numpy()
+        y_pred[output > y_thres] = 1
+        y_pred[output <= y_thres] = 0
         # append result
         if predict_list is None:
             predict_list = output
@@ -109,8 +115,22 @@ for name in sitenames:
     valid_loss = sum_loss / len(valid_dataloader) 
     true_list = np.squeeze(true_list)
     pred_list = np.squeeze(pred_list)
+    #print(predict_list.max(), predict_list.min())
+    #print(y_thres.max(), y_thres.min())
+    #print(true_list.max(), true_list.min())
+    #input("#$@%")
     f1, macro, micro, weighted = get_score(true_list, pred_list)
-    print(f"f1: {f1}, macro: {macro}, micro: {micro}, weighted: {weighted}")
-        
+    name_list.append(sitename)
+    data_list["f1"].append(f1); data_list["macro"].append(macro); data_list["micro"].append(micro); data_list["weighted"].append(weighted)
+    #print(f"f1: {f1}, macro: {macro}, micro: {micro}, weighted: {weighted}")
     # Save results
     np.save(f"{save_dir}/{sitename}.npy", predict_list)
+# save quantitative analysis
+df = pd.DataFrame({
+    "sitename": name_list, 
+    "f1":       data_list["f1"],
+    "micro":    data_list["micro"],
+    "macro":    data_list["macro"],
+    "weighted": data_list["weighted"]
+})
+df.to_csv(f"{save_dir}/{no}.csv", index=False)

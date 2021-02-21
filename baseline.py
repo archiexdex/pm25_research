@@ -92,4 +92,4 @@ df = pd.DataFrame({
     "shift_8_weighted": data8_list["weighted"],
 
 })
-df.to_csv("base.csv", index=True)
+df.to_csv("base.csv", index=False)

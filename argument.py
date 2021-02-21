@@ -24,7 +24,7 @@ def add_arguments(parser):
     parser.add_argument('--source_size',   type=int,   default=8,   help='')
     parser.add_argument('--target_size',   type=int,   default=1,   help='')
     parser.add_argument('--threshold',    type=int,   default=70,  help='')
-    parser.add_argument('--shuffle',    type=bool,   default=True,  help='')
+    parser.add_argument('--shuffle',    type=bool,   default=False,  help='')
 
     parser.add_argument('--input_dim',       type=int,   default=16,  help='')
     parser.add_argument('--output_dim',      type=int,   default=1,  help='')

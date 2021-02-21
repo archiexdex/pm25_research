@@ -39,7 +39,7 @@ class PMSingleSiteDataset(Dataset):
         self.target_size = config.target_size
         self.threshold = config.threshold
         self.shuffle = config.shuffle
-        self.size = len(self.data) - self.memory_size - self.window_size - self.source_size - self.target_size + 1
+        self.size = len(self.data) - self.memory_size - self.source_size - self.target_size + 1
         self.mean = {}
         self.std = {}
         self.threshold = {}
@@ -49,71 +49,88 @@ class PMSingleSiteDataset(Dataset):
             self.std = json.load(fp)[sitename]
         with open(config.threshold_path, "r") as fp:
             self.threshold = json.load(fp)[sitename]
-        # Normalize data
+        # Backup the data
         self.data_copy = self.data.copy()
-        # summer
-        self.s_index = np.isin(self.data[:, -3], [4,5,6,7,8,9])
-        # winter
-        self.w_index = np.isin(self.data[:, -3], [4,5,6,7,8,9], invert=True)
+        # summer threshold
+        s_index = np.isin(self.data[:, -3], [4,5,6,7,8,9])
+        # winter threshold
+        w_index = np.isin(self.data[:, -3], [4,5,6,7,8,9], invert=True)
+        # create y_true
+        y_true = self.data[:, 7:8].copy()
+        thres_list = np.zeros((self.data.shape[0], 1))
+        s_threshold = self.threshold["summer"]
+        w_threshold = self.threshold["winter"]
+        s_data = y_true[s_index]
+        w_data = y_true[w_index]
+        s_data[s_data <= s_threshold] = 0
+        s_data[s_data > s_threshold] = 1
+        w_data[w_data <= w_threshold] = 0
+        w_data[w_data > w_threshold] = 1
+        y_true[s_index] = s_data
+        y_true[w_index] = w_data
+        thres_list[s_index] = s_threshold
+        thres_list[w_index] = w_threshold
+        self.y_true = y_true
+        self.thres_list = thres_list
+        # Normalize data
         self.data = (self.data - self.mean) / self.std
-        
-        self.s_threshold = ( self.threshold["summer"] - self.mean[7]) / self.std[7]
-        self.w_threshold = ( self.threshold["winter"] - self.mean[7]) / self.std[7]
         # Create past window input & past extreme event label
-        self.all_window = np.zeros([self.size+self.memory_size, self.window_size, 16])
-        self.all_ext    = np.zeros([self.size+self.memory_size, 1])
-        for j in range(self.all_window.shape[0]):
-            self.all_window[j] = self.data[j: j+self.window_size]
-            st = j + self.window_size + self.target_size - 1
-            ed = j + self.window_size + self.target_size
-            if st in self.s_index:
-                threshold = self.s_threshold
-            else:
-                threshold = self.w_threshold
-            self.all_ext[j] = self.data[st: ed, 7:8] > threshold
+        #self.all_window = np.zeros([self.size+self.memory_size, self.window_size, 16])
+        #self.all_ext    = np.zeros([self.size+self.memory_size, 1])
+        #for j in range(self.all_window.shape[0]):
+        #    self.all_window[j] = self.data[j: j+self.window_size]
+        #    st = j + self.window_size + self.target_size - 1
+        #    ed = j + self.window_size + self.target_size
+        #    if st in self.s_index:
+        #        threshold = self.s_threshold
+        #    else:
+        #        threshold = self.w_threshold
+        #    self.all_ext[j] = self.data[st: ed, 7:8] > threshold
 
     def __len__(self):
         return self.size
 
     def __getitem__(self, idx):
         """
-            past_window: [batch, window_size, window_len, 16]
-            past_ext: [batch, window_size, 1]
+            past_window: [batch, window_len, 16]
+            past_ext: [batch, window_len, 1]
             x: [batch, target_len, 16]
             y: [batch, target_len, 1]
             y_ext: [batch, target_len, 1]
         """
         # Past window, each window has a sequence of data
+        #st = idx
+        #ed = idx + self.memory_size 
+        #past_window = self.all_window[st: ed]
+        #past_ext = self.all_ext[st: ed]
+        ## shuffle window
+        #indexs = np.arange(self.memory_size)
+        #if self.shuffle:
+        #    np.random.shuffle(indexs)
+        #    past_window = past_window[indexs]
+        #    past_ext = past_ext[indexs]
         st = idx
-        ed = idx + self.memory_size 
-        past_window = self.all_window[st: ed]
-        past_ext = self.all_ext[st: ed]
-        # shuffle window
-        indexs = np.arange(self.memory_size)
-        if self.shuffle:
-            np.random.shuffle(indexs)
-            past_window = past_window[indexs]
-            past_ext = past_ext[indexs]
+        ed = idx + self.memory_size
+        past_window = self.data[st: ed]
+        past_ext = self.y_true[st: ed]
         
         # Input
-        st = idx + self.memory_size + self.window_size
-        ed = idx + self.memory_size + self.window_size + self.source_size
+        st = idx + self.memory_size 
+        ed = idx + self.memory_size + self.source_size
         x = self.data[st: ed]
         # Target, only predict pm2.5, so select '7:8'
-        st = idx + self.memory_size + self.window_size + self.source_size + self.target_size - 1
-        ed = idx + self.memory_size + self.window_size + self.source_size + self.target_size
+        st = idx + self.memory_size + self.source_size + self.target_size - 1
+        ed = idx + self.memory_size + self.source_size + self.target_size
         y = self.data[st: ed, 7:8]
-        if st in self.s_index:
-            threshold = self.s_threshold
-        else:
-            threshold = self.w_threshold
-        y_ext = y > threshold
+        y_ext = self.y_true[st: ed]
+        y_thres = self.thres_list[st: ed]
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\
                 torch.FloatTensor(y_ext),\
                 torch.FloatTensor(past_window),\
-                torch.FloatTensor(past_ext)
+                torch.FloatTensor(past_ext), \
+                torch.FloatTensor(y_thres)
     
     def get_gev_params(self):
         x = self.data[:, 7]
