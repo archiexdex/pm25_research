@@ -1,3 +1,4 @@
+from constants import * 
 import torch
 from torch.utils.data import Dataset
 from torch import Tensor, FloatTensor
@@ -7,39 +8,29 @@ import json
 import os, shutil
 from lmoments3 import distr
 
-# size of 73
-sitenames = [
-    '三義', '三重', '中壢', '中山', '二林', '仁武', '冬山', '前金', '前鎮', '南投', 
-    '古亭', '善化', '嘉義', '土城', '埔里', '基隆', '士林', '大同', '大園', '大寮', 
-    '大里', '安南', '宜蘭', '小港', '屏東', '崙背', '左營', '平鎮', '彰化', '復興', 
-    '忠明', '恆春', '斗六', '新店', '新港', '新營', '新竹', '新莊', '朴子', '松山', 
-    '板橋', '林口', '林園', '桃園', '楠梓', '橋頭', '永和', '汐止', '沙鹿', '淡水', 
-    '湖口', '潮州', '竹山', '竹東', '線西', '美濃', '臺南', '臺東', '臺西', '花蓮', 
-    '苗栗', '菜寮', '萬華', '萬里', '西屯', '觀音', '豐原', '關山', '陽明', '頭份', 
-    '鳳山', '麥寮', '龍潭'
-    ]
 sitenames_sorted = sorted(sitenames)
 
-feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
-                'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
-                'month', 'day', 'hour'
-                ]
 class PMSingleSiteDataset(Dataset):
     def __init__(self, config, sitename, isTrain=False):
         
-        filename = f"dataset/origin/train/{sitename}.npy" if isTrain else f"dataset/origin/valid/{sitename}.npy"
+        filename = f"data/origin/train/{sitename}.npy" if isTrain else f"data/origin/valid/{sitename}.npy"
         if os.path.exists(filename):
             self.data = np.load(filename) 
         else:
             raise ValueError(f"path {filename} doesn't exist")
 
+        self.model       = config.model
         self.memory_size = config.memory_size
         self.window_size = config.window_size
         self.source_size = config.source_size
         self.target_size = config.target_size
         self.threshold = config.threshold
         self.shuffle = config.shuffle
-        self.size = len(self.data) - self.memory_size - self.source_size - self.target_size + 1
+        self.is_transform = config.is_transform
+        if self.model == "fudan":
+            self.size = len(self.data) - self.memory_size - self.window_size - self.source_size - self.target_size + 1
+        else:
+            self.size = len(self.data) - self.memory_size - self.source_size - self.target_size + 1
         self.mean = {}
         self.std = {}
         self.threshold = {}
@@ -75,17 +66,13 @@ class PMSingleSiteDataset(Dataset):
         # Normalize data
         self.data = (self.data - self.mean) / self.std
         # Create past window input & past extreme event label
-        #self.all_window = np.zeros([self.size+self.memory_size, self.window_size, 16])
-        #self.all_ext    = np.zeros([self.size+self.memory_size, 1])
-        #for j in range(self.all_window.shape[0]):
-        #    self.all_window[j] = self.data[j: j+self.window_size]
-        #    st = j + self.window_size + self.target_size - 1
-        #    ed = j + self.window_size + self.target_size
-        #    if st in self.s_index:
-        #        threshold = self.s_threshold
-        #    else:
-        #        threshold = self.w_threshold
-        #    self.all_ext[j] = self.data[st: ed, 7:8] > threshold
+        self.all_window = np.zeros([self.size+self.memory_size, self.window_size, 16])
+        self.all_ext    = np.zeros([self.size+self.memory_size, 1])
+        for j in range(self.all_window.shape[0]):
+            self.all_window[j] = self.data[j: j+self.window_size]
+            st = j + self.window_size + self.target_size - 1
+            ed = j + self.window_size + self.target_size
+            self.all_ext[j] = self.y_true[st: ed]
 
     def __len__(self):
         return self.size
@@ -99,20 +86,22 @@ class PMSingleSiteDataset(Dataset):
             y_ext: [batch, target_len, 1]
         """
         # Past window, each window has a sequence of data
-        #st = idx
-        #ed = idx + self.memory_size 
-        #past_window = self.all_window[st: ed]
-        #past_ext = self.all_ext[st: ed]
-        ## shuffle window
-        #indexs = np.arange(self.memory_size)
-        #if self.shuffle:
-        #    np.random.shuffle(indexs)
-        #    past_window = past_window[indexs]
-        #    past_ext = past_ext[indexs]
-        st = idx
-        ed = idx + self.memory_size
-        past_window = self.data[st: ed]
-        past_ext = self.y_true[st: ed]
+        if self.model == "fudan":
+            st = idx
+            ed = idx + self.memory_size 
+            past_window = self.all_window[st: ed]
+            past_ext = self.all_ext[st: ed]
+            # shuffle window
+            indexs = np.arange(self.memory_size)
+            if self.shuffle:
+                np.random.shuffle(indexs)
+                past_window = past_window[indexs]
+                past_ext = past_ext[indexs]
+        else:
+            st = idx
+            ed = idx + self.memory_size
+            past_window = self.data[st: ed]
+            past_ext = self.y_true[st: ed]
         
         # Input
         st = idx + self.memory_size 
@@ -125,12 +114,21 @@ class PMSingleSiteDataset(Dataset):
         y_ext = self.y_true[st: ed]
         y_thres = self.thres_list[st: ed]
 
+        # For CNN
+        if self.is_transform:
+            past_window = np.transpose(past_window, (1, 0))
+            past_ext = np.transpose(past_ext, (1, 0))
+            x = np.transpose(x, (1, 0))
+            y = np.transpose(y, (1, 0))
+            y_ext = np.transpose(y_ext, (1, 0))
+
+
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\
                 torch.FloatTensor(y_ext),\
                 torch.FloatTensor(past_window),\
                 torch.FloatTensor(past_ext), \
-                torch.FloatTensor(y_thres)
+                torch.FloatTensor(y_thres) # For testing to check the values
     
     def get_gev_params(self):
         x = self.data[:, 7]

@@ -4,6 +4,31 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 
+class CNNModel(nn.Module):
+    def __init__(self, input_dim, emb_dim, output_dim, seq_len, trg_len, device, dropout=0.6):
+        super().__init__()
+        self.emb = nn.Conv1d(input_dim, emb_dim, 3, padding=1)
+        self.net = nn.Sequential(*[
+                        nn.Conv1d(emb_dim, emb_dim, 3, padding=1),
+                        #nn.BatchNorm1d(emb_dim),
+                        nn.InstanceNorm1d(emb_dim),
+                        nn.Tanh()
+                    ])
+        self.out = nn.Conv1d(emb_dim, output_dim, 3, padding=1)
+        self.fc  = nn.Linear(seq_len, trg_len)
+
+
+    def forward(self, x, past_window, past_ext):
+        # x: [batch, channel, length]
+        # past_window: [batch, channel, length]
+        # past_ext: [batch, channel, length]
+        x = torch.cat((past_window, x), -1)
+        x = self.emb(x)
+        x = self.net(x)
+        x = self.out(x)
+        x = self.fc(x)
+        return x
+
 class Fudan(nn.Module):
     def __init__(self, input_dim, emb_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=False):
         super().__init__()

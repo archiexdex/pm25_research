@@ -8,7 +8,7 @@ from torch import nn
 from torch.utils.data import DataLoader 
 from constants import * 
 from model import * 
-from dataset.dataset import PMSingleSiteDataset 
+from dataset import PMSingleSiteDataset 
 import pandas as pd
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -32,9 +32,9 @@ if not os.path.exists(cpt_dir):
 
 mean_dict = {}
 std_dict = {}
-with open("dataset/train_mean.json", "r") as fp:
+with open(opt.mean_path, "r") as fp:
     mean_dict = json.load(fp)
-with open("dataset/train_std.json", "r") as fp:
+with open(opt.std_path, "r") as fp:
     std_dict = json.load(fp)
 
 name_list = []
@@ -71,6 +71,16 @@ for name in sitenames:
                     dropout=opt.dropout,
                     bidirectional=opt.bidirectional,
                 )
+    elif model_name == "cnn":
+        model = CNNModel(
+                    input_dim=opt.input_dim,
+                    emb_dim=opt.emb_dim,
+                    output_dim=opt.output_dim,
+                    seq_len=opt.memory_size+opt.source_size,
+                    trg_len=1,
+                    device=device,
+                    dropout=opt.dropout,
+                )
     checkpoint = torch.load(os.path.join(cpt_dir, f"{sitename}.pt"))
     model.load_state_dict(checkpoint) 
     model.to(device)
@@ -90,15 +100,20 @@ for name in sitenames:
             _, y_pred, output = model(x, past_window, past_ext)
         elif model_name == "seq2seq":
             output, y_pred = model(x, past_window, past_ext)
+        elif model_name == "cnn":
+            output = model(x, past_window, past_ext)
         loss = criterion(output, y)
         sum_loss += loss.item()
         # Denorm the data
         x = x.cpu().numpy() * std + mean
         y = y.cpu().numpy() * std + mean
         output = output.cpu().detach().numpy() * std + mean 
-        y_pred = y_pred.cpu().detach().numpy() 
         y_ext = y_ext.cpu().numpy()
         y_thres = y_thres.cpu().numpy()
+        if model_name in ["fudan", "seq2seq"]:
+            y_pred = y_pred.cpu().detach().numpy() 
+        else:
+            y_pred = np.zeros(output.shape)
         y_pred[output > y_thres] = 1
         y_pred[output <= y_thres] = 0
         # append result
@@ -133,4 +148,4 @@ df = pd.DataFrame({
     "macro":    data_list["macro"],
     "weighted": data_list["weighted"]
 })
-df.to_csv(f"{save_dir}/{no}.csv", index=False)
+df.to_csv(f"{save_dir}/{no}.csv", index=False, encoding='utf_8_sig')

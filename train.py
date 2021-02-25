@@ -7,7 +7,7 @@ from torch import nn
 from torch.utils.data import DataLoader 
 from datetime import datetime 
 from model import * 
-from dataset.dataset import PMSingleSiteDataset 
+from dataset import PMSingleSiteDataset 
 from constants import *
 import csv 
 
@@ -71,6 +71,16 @@ for name in sitenames:
                     dropout=opt.dropout,
                     bidirectional=opt.bidirectional,
                 )
+    elif model_name == "cnn":
+        model = CNNModel(
+                    input_dim=opt.input_dim,
+                    emb_dim=opt.emb_dim,
+                    output_dim=opt.output_dim,
+                    seq_len=opt.memory_size+opt.source_size,
+                    trg_len=1,
+                    device=device,
+                    dropout=opt.dropout,
+                )
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
     mse = nn.MSELoss()
@@ -107,6 +117,10 @@ for name in sitenames:
                 prediction_loss = mse(prediction, y)
                 target_ext_loss = bce(y_pred, y_ext)
                 loss = prediction_loss + target_ext_loss
+            elif model_name == "cnn":
+                prediction = model(x, past_window, past_ext)
+                prediction_loss = mse(prediction, y)
+                loss = prediction_loss
             # Update model
             optimizer.zero_grad()
             loss.backward()
@@ -114,7 +128,8 @@ for name in sitenames:
             # Record loss
             if model_name == "fudan":
                 mean_past_ext_loss += past_ext_loss.item()
-            mean_target_ext_loss += target_ext_loss.item()
+            if model_name in ["fudan", "seq2seq"]:
+                mean_target_ext_loss += target_ext_loss.item()
             mean_prediction_loss += prediction_loss.item()
             trange.set_description(f"Training mean loss past_ext: {mean_past_ext_loss / (idx+1):.3e}, target_ext: {mean_target_ext_loss / (idx+1):.4f}, prediction: {mean_prediction_loss / (idx+1):.3e}")
         train_loss = mean_prediction_loss / len(train_dataloader)
@@ -130,6 +145,8 @@ for name in sitenames:
                 _, y_pred, prediction = model(x, past_window, past_ext)
             elif model_name == "seq2seq":
                 prediction, y_pred = model(x, past_window, past_ext)
+            elif model_name == "cnn":
+                prediction = model(x, past_window, past_ext)
             # Calculate loss
             prediction_loss = mse(prediction, y)
             # Record loss

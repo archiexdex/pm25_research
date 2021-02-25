@@ -1,3 +1,4 @@
+from constants import *
 import pandas as pd
 import numpy as np
 import os, shutil
@@ -10,37 +11,14 @@ np files what aimed to access data quickly.
 
 # MARK: - Variables
 
-all_sitenames_76 = [
-    '三義', '三重', '中壢', '中山', '二林', '仁武', '冬山', '前金', '前鎮', '南投',
-    '古亭', '善化', '嘉義', '土城', '埔里', '基隆', '士林', '大同', '大園', '大寮',
-    '大里', '安南', '宜蘭', '小港', '屏東', '崙背', '左營', '平鎮', '彰化', '復興',
-    '忠明', '恆春', '斗六', '新店', '新港', '新營', '新竹', '新莊', '朴子', '松山',
-    '板橋', '林口', '林園', '桃園', '楠梓', '橋頭', '永和', '汐止', '沙鹿', '淡水',
-    '湖口', '潮州', '竹山', '竹東', '線西', '美濃', '臺南', '臺東', '臺西', '花蓮',
-    '苗栗', '菜寮', '萬華', '萬里', '西屯', '觀音', '豐原', '金門', '關山', '陽明',
-    '頭份', '馬公', '馬祖', '鳳山', '麥寮', '龍潭'
-    ]
-
 # size of 73
-sitenames = [
-    '三義', '三重', '中壢', '中山', '二林', '仁武', '冬山', '前金', '前鎮', '南投', 
-    '古亭', '善化', '嘉義', '土城', '埔里', '基隆', '士林', '大同', '大園', '大寮', 
-    '大里', '安南', '宜蘭', '小港', '屏東', '崙背', '左營', '平鎮', '彰化', '復興', 
-    '忠明', '恆春', '斗六', '新店', '新港', '新營', '新竹', '新莊', '朴子', '松山', 
-    '板橋', '林口', '林園', '桃園', '楠梓', '橋頭', '永和', '汐止', '沙鹿', '淡水', 
-    '湖口', '潮州', '竹山', '竹東', '線西', '美濃', '臺南', '臺東', '臺西', '花蓮', 
-    '苗栗', '菜寮', '萬華', '萬里', '西屯', '觀音', '豐原', '關山', '陽明', '頭份', 
-    '鳳山', '麥寮', '龍潭'
-    ]
 sitenames_sorted = sorted(sitenames)
 
 # pollutant features = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5']
 # weather features = ['RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',]
 feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
-                # 'sn', 'read_time'
                 ]
-
 
 dataset_files = ['epa_tw_14_direction.csv',
                 'epa_tw_15_direction.csv',
@@ -53,11 +31,11 @@ def read_csv(dataset):
     data = pd.DataFrame()
     if dataset == "train":
         for d in dataset_files[:4]:
-            read_path = os.path.join(os.path.dirname(__file__), d)
+            read_path = os.path.join("data", d)
             data = data.append(pd.read_csv(read_path, index_col='Unnamed: 0'))
     elif dataset == "valid":
         for d in dataset_files[4:]:
-            read_path = os.path.join(os.path.dirname(__file__), d)
+            read_path = os.path.join("data", d)
             data = data.append(pd.read_csv(read_path, index_col='Unnamed: 0'))
     elif dataset == "all":
         for d in dataset_files:
@@ -178,33 +156,33 @@ if __name__ == '__main__':
 
     # Save file
     print("Save file")
-    with open("train_mean.json", "w") as fp:
+    with open("data/train_mean.json", "w") as fp:
         json.dump(train_mean, fp, ensure_ascii=False, indent=4)
-    with open("train_std.json", "w") as fp:
+    with open("data/train_std.json", "w") as fp:
         json.dump(train_std,  fp, ensure_ascii=False, indent=4)
-    with open("train_threshold.json", "w") as fp:
+    with open("data/train_threshold.json", "w") as fp:
         json.dump(train_threshold,  fp, ensure_ascii=False, indent=4)
     
     # check whether the folder exists
     try:
-        os.mkdir("origin")
+        os.mkdir("data/origin")
     except:
-        shutil.rmtree("origin")
-        os.mkdir("origin")
-    os.mkdir("origin/train")
-    os.mkdir("origin/valid")
+        shutil.rmtree("data/origin")
+        os.mkdir("data/origin")
+    os.mkdir("data/origin/train")
+    os.mkdir("data/origin/valid")
     
     try:
-        os.mkdir("norm")
+        os.mkdir("data/norm")
     except:
-        shutil.rmtree("norm")
-        os.mkdir("norm")
-    os.mkdir("norm/train")
-    os.mkdir("norm/valid")
+        shutil.rmtree("data/norm")
+        os.mkdir("data/norm")
+    os.mkdir("data/norm/train")
+    os.mkdir("data/norm/valid")
 
     for key in train_data_dict:
-        np.save(f"origin/train/{key}.npy", train_data_dict[key])
-        np.save(f"origin/valid/{key}.npy", valid_data_dict[key])
-        np.save(f"norm/train/{key}.npy", train_norm_data[key])
-        np.save(f"norm/valid/{key}.npy", valid_norm_data[key])
+        np.save(f"data/origin/train/{key}.npy", train_data_dict[key])
+        np.save(f"data/origin/valid/{key}.npy", valid_data_dict[key])
+        np.save(f"data/norm/train/{key}.npy", train_norm_data[key])
+        np.save(f"data/norm/valid/{key}.npy", valid_norm_data[key])
     

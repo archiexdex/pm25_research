@@ -7,7 +7,7 @@ from sklearn.metrics import f1_score, precision_score
 
 train_path = "dataset/origin/train"
 valid_path = "dataset/origin/valid"
-ratio = 2
+ratio = 1.5
 
 name_list = []
 data1_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
