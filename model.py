@@ -10,8 +10,8 @@ class CNNModel(nn.Module):
         self.emb = nn.Conv1d(input_dim, emb_dim, 3, padding=1)
         self.net = nn.Sequential(*[
                         nn.Conv1d(emb_dim, emb_dim, 3, padding=1),
-                        #nn.BatchNorm1d(emb_dim),
-                        nn.InstanceNorm1d(emb_dim),
+                        nn.BatchNorm1d(emb_dim),
+                        #nn.InstanceNorm1d(emb_dim),
                         nn.Tanh()
                     ])
         self.out = nn.Conv1d(emb_dim, output_dim, 3, padding=1)
@@ -28,6 +28,75 @@ class CNNModel(nn.Module):
         x = self.out(x)
         x = self.fc(x)
         return x
+
+class CNN2DModel(nn.Module):
+    def __init__(self, input_dim, emb_dim, output_dim, seq_len, trg_len, device, dropout=0.6):
+        super().__init__()
+        self.emb = nn.Conv2d(input_dim, emb_dim, 3, padding=1)
+        self.net = nn.Sequential(*[
+                        nn.Conv2d(emb_dim, emb_dim, 3, padding=1),
+                        nn.BatchNorm2d(emb_dim),
+                        #nn.InstanceNorm1d(emb_dim),
+                        nn.Tanh()
+                    ])
+        self.out = nn.Conv2d(emb_dim, output_dim, 3, padding=1)
+        self.fc  = nn.Linear(seq_len, trg_len)
+
+
+    def forward(self, x, past_window, past_ext):
+        # x: [batch, channel, length]
+        # past_window: [batch, channel, length]
+        # past_ext: [batch, channel, length]
+        x = torch.cat((past_window, x), -1)
+        x = self.emb(x)
+        x = self.net(x)
+        x = self.out(x)
+        x = self.fc(x)
+        return x
+class UNET(nn.Module):
+    def __init__(self, input_dim, emb_dim, output_dim, seq_len, trg_len, device, dropout=0.6):
+        super().__init__()
+
+        def _conv(in_c, out_c, kernel=3, stride=1):
+            return nn.Sequential(*[
+                    nn.Conv1d(in_c, out_c, kernel_size=kernel, stride=stride, padding=kernel//2),
+                    #nn.BatchNorm1d(out_c),
+                    nn.InstanceNorm1d(out_c),
+                    nn.Tanh()
+            ])
+        
+        self.emb = nn.Conv1d(input_dim, emb_dim, 3, padding=1)
+        self.conv1 = _conv(emb_dim * 1, emb_dim * 2)
+        self.conv2 = _conv(emb_dim * 2, emb_dim * 4)
+        self.conv3 = _conv(emb_dim * 4, emb_dim * 4)
+        self.deconv2 = _conv(emb_dim * 8, emb_dim * 2)
+        self.deconv1 = _conv(emb_dim * 4, emb_dim * 1)
+        self.maxpool = nn.MaxPool1d(3, stride=2, padding=1)
+        self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
+        self.out = nn.Conv1d(emb_dim, output_dim, 3, padding=1)
+        self.fc  = nn.Linear(seq_len, trg_len)
+
+
+    def forward(self, x, past_window, past_ext):
+        # x: [batch, channel, length]
+        # past_window: [batch, channel, length]
+        # past_ext: [batch, channel, length]
+        x = torch.cat((past_window, x), -1)
+        x = self.emb(x)
+        x1 = self.conv1(x)
+        x2 = self.maxpool(x1)
+        x2 = self.conv2(x2)
+        x3 = self.maxpool(x2)
+        x3 = self.conv3(x3)
+        x4 = self.upsample(x3)
+        x4 = torch.cat((x2, x4), 1)
+        x4 = self.deconv2(x4)
+        x5 = self.upsample(x4)
+        x5 = torch.cat((x1, x5), 1)
+        x5 = self.deconv1(x5)
+        out = self.out(x5)
+        out = self.fc(out)
+        return out
 
 class Fudan(nn.Module):
     def __init__(self, input_dim, emb_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=False):

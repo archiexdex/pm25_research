@@ -39,10 +39,8 @@ with open(opt.std_path, "r") as fp:
 
 name_list = []
 data_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
-for name in sitenames:
+for idx, name in enumerate(sample_sites):
     sitename = name 
-    if sitename not in sample_sites:
-        continue 
     print(f"sitename: {name}")
     valid_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=False)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
@@ -133,7 +131,6 @@ for name in sitenames:
     #print(predict_list.max(), predict_list.min())
     #print(y_thres.max(), y_thres.min())
     #print(true_list.max(), true_list.min())
-    #input("#$@%")
     f1, macro, micro, weighted = get_score(true_list, pred_list)
     name_list.append(sitename)
     data_list["f1"].append(f1); data_list["macro"].append(macro); data_list["micro"].append(micro); data_list["weighted"].append(weighted)

@@ -81,6 +81,16 @@ for name in sitenames:
                     device=device,
                     dropout=opt.dropout,
                 )
+    elif model_name == 'unet':
+        model = UNET(
+                    input_dim=opt.input_dim,
+                    emb_dim=opt.emb_dim,
+                    output_dim=opt.output_dim,
+                    seq_len=opt.memory_size+opt.source_size,
+                    trg_len=1,
+                    device=device,
+                    dropout=opt.dropout,
+                )
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
     mse = nn.MSELoss()
@@ -117,7 +127,7 @@ for name in sitenames:
                 prediction_loss = mse(prediction, y)
                 target_ext_loss = bce(y_pred, y_ext)
                 loss = prediction_loss + target_ext_loss
-            elif model_name == "cnn":
+            elif model_name in ["cnn", "unet"]:
                 prediction = model(x, past_window, past_ext)
                 prediction_loss = mse(prediction, y)
                 loss = prediction_loss
@@ -145,7 +155,7 @@ for name in sitenames:
                 _, y_pred, prediction = model(x, past_window, past_ext)
             elif model_name == "seq2seq":
                 prediction, y_pred = model(x, past_window, past_ext)
-            elif model_name == "cnn":
+            elif model_name in ["cnn", "unet"]:
                 prediction = model(x, past_window, past_ext)
             # Calculate loss
             prediction_loss = mse(prediction, y)

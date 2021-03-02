@@ -10,6 +10,113 @@ from lmoments3 import distr
 
 sitenames_sorted = sorted(sitenames)
 
+class PMMultiSiteDataset(Dataset):
+    def __init__(self, config, sitenames, isTrain=False):
+        
+        self.model        = config.model
+        self.memory_size  = config.memory_size
+        self.window_size  = config.window_size
+        self.source_size  = config.source_size
+        self.target_size  = config.target_size
+        self.shuffle      = config.shuffle
+        self.is_transform = config.is_transform
+
+        with open(config.mean_path, "r") as fp:
+            mean_dict = json.load(fp)
+        with open(config.std_path, "r") as fp:
+            std_dict = json.load(fp)
+        with open(config.threshold_path, "r") as fp:
+            threshold_dict = json.load(fp)
+
+        self.data, self.data_copy, self.y_true, self.thres_list = [[] for _ in range(4)]
+        self.data_copy = []
+        for sitename in sitenames:
+            filename = f"data/origin/train/{sitename}.npy" if isTrain else f"data/origin/valid/{sitename}.npy"
+            if os.path.exists(filename):
+                 data = np.load(filename) 
+            else:
+                raise ValueError(f"path {filename} doesn't exist")
+            
+            data_copy = data.copy()
+            # summer threshold
+            s_index = np.isin(data[:, -3], [4,5,6,7,8,9])
+            # winter threshold
+            w_index = np.isin(data[:, -3], [4,5,6,7,8,9], invert=True)
+            # create y_true
+            y_true = data[:, 7:8].copy()
+            thres_list = np.zeros((data.shape[0], 1))
+            s_threshold = threshold_dict[sitename]["summer"]
+            w_threshold = threshold_dict[sitename]["winter"]
+            s_data = y_true[s_index]
+            w_data = y_true[w_index]
+            s_data[s_data <= s_threshold] = 0
+            s_data[s_data > s_threshold] = 1
+            w_data[w_data <= w_threshold] = 0
+            w_data[w_data > w_threshold] = 1
+            y_true[s_index] = s_data
+            y_true[w_index] = w_data
+            thres_list[s_index] = s_threshold
+            thres_list[w_index] = w_threshold
+            # Normalize data
+            mean = mean_dict[sitename]
+            std  = std_dict[sitename]
+            data = (data - mean) / std
+            # Append each data to list
+            self.data.append(data)
+            self.data_copy.append(data_copy)
+            self.y_true.append(y_true)
+            self.thres_list.append(thres_list)
+        self.size       = len(self.data[0]) - self.memory_size - self.source_size - self.target_size + 1
+        self.data       = np.array(self.data)
+        self.data_copy  = np.array(self.data_copy)
+        self.y_true     = np.array(self.y_true)
+        self.thres_list = np.array(self.thres_list)
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        """
+            past_window: [batch, site_size, window_len, 16]
+            past_ext:    [batch, site_size, window_len, 1]
+            x:           [batch, site_size, target_len, 16]
+            y:           [batch, site_size, target_len, 1]
+            y_ext:       [batch, site_size, target_len, 1]
+        """
+        # Past window, each window has a sequence of data
+        st = idx
+        ed = idx + self.memory_size
+        past_window = self.data[:, st: ed]
+        past_ext    = self.y_true[:, st: ed]
+        
+        # Input
+        st = idx + self.memory_size 
+        ed = idx + self.memory_size + self.source_size
+        x = self.data[:, st: ed]
+        # Target, only predict pm2.5, so select '7:8'
+        st = idx + self.memory_size + self.source_size + self.target_size - 1
+        ed = idx + self.memory_size + self.source_size + self.target_size
+        y       = self.data[:, st: ed, 7:8]
+        y_ext   = self.y_true[:, st: ed]
+        y_thres = self.thres_list[:, st: ed]
+
+        # For CNN
+        if self.is_transform > 0:
+            past_window = np.transpose(past_window, (2, 0, 1))
+            past_ext = np.transpose(past_ext, (2, 0, 1))
+            x = np.transpose(x, (2, 0, 1))
+            y = np.transpose(y, (2, 0, 1))
+            y_ext = np.transpose(y_ext, (2, 0, 1))
+            y_thres = np.transpose(y_thres, (2, 0, 1))
+
+
+        return  torch.FloatTensor(x),\
+                torch.FloatTensor(y),\
+                torch.FloatTensor(y_ext),\
+                torch.FloatTensor(past_window),\
+                torch.FloatTensor(past_ext), \
+                torch.FloatTensor(y_thres) # For testing to check the values
+    
 class PMSingleSiteDataset(Dataset):
     def __init__(self, config, sitename, isTrain=False):
         
@@ -19,14 +126,15 @@ class PMSingleSiteDataset(Dataset):
         else:
             raise ValueError(f"path {filename} doesn't exist")
 
-        self.model       = config.model
-        self.memory_size = config.memory_size
-        self.window_size = config.window_size
-        self.source_size = config.source_size
-        self.target_size = config.target_size
-        self.threshold = config.threshold
-        self.shuffle = config.shuffle
+        self.model        = config.model
+        self.memory_size  = config.memory_size
+        self.window_size  = config.window_size
+        self.source_size  = config.source_size
+        self.target_size  = config.target_size
+        self.threshold    = config.threshold
+        self.shuffle      = config.shuffle
         self.is_transform = config.is_transform
+
         if self.model == "fudan":
             self.size = len(self.data) - self.memory_size - self.window_size - self.source_size - self.target_size + 1
         else:
@@ -93,7 +201,7 @@ class PMSingleSiteDataset(Dataset):
             past_ext = self.all_ext[st: ed]
             # shuffle window
             indexs = np.arange(self.memory_size)
-            if self.shuffle:
+            if self.shuffle > 0:
                 np.random.shuffle(indexs)
                 past_window = past_window[indexs]
                 past_ext = past_ext[indexs]
@@ -115,7 +223,7 @@ class PMSingleSiteDataset(Dataset):
         y_thres = self.thres_list[st: ed]
 
         # For CNN
-        if self.is_transform:
+        if self.is_transform > 0:
             past_window = np.transpose(past_window, (1, 0))
             past_ext = np.transpose(past_ext, (1, 0))
             x = np.transpose(x, (1, 0))
