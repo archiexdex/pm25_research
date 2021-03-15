@@ -1,4 +1,5 @@
 from constants import *
+from utils import *
 import pandas as pd
 import numpy as np
 import os, shutil
@@ -11,6 +12,7 @@ np files what aimed to access data quickly.
 
 # MARK: - Variables
 
+opt = parse()
 # size of 73
 sitenames_sorted = sorted(sitenames)
 
@@ -18,30 +20,36 @@ sitenames_sorted = sorted(sitenames)
 # weather features = ['RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',]
 feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
-                ]
+               ]
 
 dataset_files = ['epa_tw_14_direction.csv',
-                'epa_tw_15_direction.csv',
-                'epa_tw_16_direction.csv',
-                'epa_tw_17_direction.csv',
-                'epa_tw_18_direction.csv']
+                 'epa_tw_15_direction.csv',
+                 'epa_tw_16_direction.csv',
+                 'epa_tw_17_direction.csv',
+                 'epa_tw_18_direction.csv',
+                 'epa_tw_19_direction.csv'
+                ]
 
 # MARK: - Functions
 def read_csv(dataset):
     data = pd.DataFrame()
     if dataset == "train":
-        for d in dataset_files[:4]:
-            read_path = os.path.join("data", d)
-            data = data.append(pd.read_csv(read_path, index_col='Unnamed: 0'))
+        st, ed = 0, -1
     elif dataset == "valid":
-        for d in dataset_files[4:]:
-            read_path = os.path.join("data", d)
-            data = data.append(pd.read_csv(read_path, index_col='Unnamed: 0'))
+        st, ed = len(dataset_files)-1, len(dataset_files)
     elif dataset == "all":
-        for d in dataset_files:
-            read_path = os.path.join(os.path.dirname(__file__), d)
-            data = data.append(pd.read_csv(read_path, index_col='Unnamed: 0'))
-    return data
+        st, ed = 0, len(dataset_files)
+    data_dict = None
+    for d in dataset_files[st:ed]:
+        read_path = os.path.join("data", d)
+        data = pd.read_csv(read_path, index_col='Unnamed: 0')
+        data = filter_data(data)
+        if not data_dict:
+            data_dict = data
+        else:
+            for key in data_dict:
+                data_dict[key] = np.concatenate((data_dict[key], data[key])) 
+    return data_dict
 
 def filter_data(data):
     # parse real time
@@ -56,16 +64,16 @@ def filter_data(data):
     data_features = data[feature_cols].values
     # Fetch the time feature
     data_day   = np.zeros((data.shape[0], 1))
-    data_time  = np.zeros((data.shape[0], 1))
+    data_hour  = np.zeros((data.shape[0], 1))
     data_month = np.zeros((data.shape[0], 1))
     for i, d in enumerate(data['read_time'].apply(lambda x: x.day)):
         data_day[i,] = d
     for i, d in enumerate(data['read_time'].apply(lambda x: x.hour)):
-        data_time[i] = d
+        data_hour[i] = d
     for i, d in enumerate(data['read_time'].apply(lambda x: x.month)):
         data_month[i] = d
     # Append time and extreme event buf into data_features
-    data_features = np.concatenate((data_features, data_month, data_day, data_time), axis=-1)
+    data_features = np.concatenate((data_features, data_month, data_day, data_hour), axis=-1)
     # Fetch site and hash
     sn_hash = dict(zip(sitenames_sorted, range(len(sitenames_sorted))))
     data_sn = np.zeros((data.shape[0], 1))
@@ -73,7 +81,7 @@ def filter_data(data):
         data_sn[i] = sn_hash[d]
     # Split data by sitename
     data_dict = sn_hash.copy()
-    data_features = data_features.reshape([-1, 73, 16])
+    data_features = data_features.reshape([-1, len(sn_hash), 16])
     for i, key in enumerate(data_dict):
         data_dict[key] = data_features[:, i, :]
     return data_dict
@@ -83,14 +91,14 @@ def get_normalize(data):
         Input: 
             data: dict, data[key] = [time, feature]
         Output:
-            data: dict, data[key] = [time, feature]
             mean_dict: dict, mean_dict[key] = [mean]
             std_dict: dict, std_dict[key] = [std]
+            threshold_dict: dict, {key: {winter: value, summer: value}}
     """
     mean_dict = {}
     std_dict = {}
     threshold_dict = {}
-    ratio = 1.5
+    ratio = opt.ratio
     for i, key in enumerate(data):
         _data = data[key]
         # summer
@@ -109,8 +117,8 @@ def get_normalize(data):
         mean_dict[key] = mean.tolist()
         std_dict[key] = std.tolist()
         threshold_dict[key] = {"winter": w_threshold, "summer": s_threshold}
-        data[key] = (data[key] - mean) / std 
-    return data, mean_dict, std_dict, threshold_dict 
+        #data[key] = (data[key] - mean) / std 
+    return mean_dict, std_dict, threshold_dict 
 
 def put_normalize(data, mean_dict, std_dict):
     for i, key in enumerate(data):
@@ -139,20 +147,18 @@ def pm25_to_AQI(x):
 # MARK: - Main
 if __name__ == '__main__':
     # Read data
-    print("read data")
+    print("read data & filter feature")
+    all_data = read_csv("all")
     train_data = read_csv("train")
     valid_data = read_csv("valid")
 
-    # Filter data
-    print("filter feature")
-    train_data_dict = filter_data(train_data)
-    valid_data_dict = filter_data(valid_data)
-
     # Normalize train_data_feature
     print("normalize feature")
-    train_norm_data, train_mean, train_std, train_threshold = get_normalize(train_data_dict.copy())
-    # Normalize valid_data by train
-    valid_norm_data = put_normalize(valid_data_dict.copy(), train_mean, train_std)
+    train_mean, train_std, train_threshold = get_normalize(train_data.copy())
+    
+    # Concat train tail and valid, and all data
+    for key in train_data:
+        valid_data[key] = np.concatenate((train_data[key][-opt.memory_size:], valid_data[key]), axis=0)
 
     # Save file
     print("Save file")
@@ -169,20 +175,12 @@ if __name__ == '__main__':
     except:
         shutil.rmtree("data/origin")
         os.mkdir("data/origin")
+    os.mkdir("data/origin/all")
     os.mkdir("data/origin/train")
     os.mkdir("data/origin/valid")
     
-    try:
-        os.mkdir("data/norm")
-    except:
-        shutil.rmtree("data/norm")
-        os.mkdir("data/norm")
-    os.mkdir("data/norm/train")
-    os.mkdir("data/norm/valid")
-
-    for key in train_data_dict:
-        np.save(f"data/origin/train/{key}.npy", train_data_dict[key])
-        np.save(f"data/origin/valid/{key}.npy", valid_data_dict[key])
-        np.save(f"data/norm/train/{key}.npy", train_norm_data[key])
-        np.save(f"data/norm/valid/{key}.npy", valid_norm_data[key])
+    for key in train_data:
+        np.save(f"data/origin/all/{key}.npy",   all_data[key])
+        np.save(f"data/origin/train/{key}.npy", train_data[key])
+        np.save(f"data/origin/valid/{key}.npy", valid_data[key])
     

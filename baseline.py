@@ -1,13 +1,20 @@
+from utils import *
+from constants import *
+import matplotlib as mlp
+mlp.use('agg')
 import matplotlib.pyplot as plt
 import os, shutil
 import numpy as np
 import csv
 import pandas as pd
+from tqdm import tqdm
 from sklearn.metrics import f1_score, precision_score
 
-train_path = "dataset/origin/train"
-valid_path = "dataset/origin/valid"
-ratio = 1.5
+opt = parse()
+
+train_path = "data/origin/train"
+valid_path = "data/origin/valid"
+ratio = opt.ratio
 
 name_list = []
 data1_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
@@ -16,13 +23,13 @@ data4_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
 data8_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
 
 
-for sitename in os.listdir(valid_path):
-    filename = os.path.join(train_path, sitename)
+trange = tqdm(sitenames)
+for sitename in trange:
+    filename = os.path.join(train_path, f"{sitename}.npy")
     train_data = np.load(filename)
-    filename = os.path.join(valid_path, sitename)
+    filename = os.path.join(valid_path, f"{sitename}.npy")
     valid_data = np.load(filename)
-    sitename = sitename.split(".npy")[0]
-    print(sitename)
+    #print(sitename)
     # summer
     s_index = np.isin(train_data[:, -3], [4,5,6,7,8,9])
     s_mean = train_data[s_index, 7].mean()
@@ -92,4 +99,4 @@ df = pd.DataFrame({
     "shift_8_weighted": data8_list["weighted"],
 
 })
-df.to_csv("base.csv", index=False)
+df.to_csv(f"base_{ratio}.csv", index=False)
