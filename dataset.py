@@ -6,7 +6,7 @@ import numpy as np
 import random
 import json
 import os, shutil
-from lmoments3 import distr
+#from lmoments3 import distr
 
 sitenames_sorted = sorted(sitenames)
 
@@ -238,10 +238,10 @@ class PMSingleSiteDataset(Dataset):
                 torch.FloatTensor(past_ext), \
                 torch.FloatTensor(y_thres) # For testing to check the values
     
-    def get_gev_params(self):
-        x = self.data[:, 7]
-        params = distr.gev.lmom_fit(x)
-        mean = params['loc']
-        std = params['scale']
-        shape = params['c']
-        return mean, std, shape
+#    def get_gev_params(self):
+#        x = self.data[:, 7]
+#        params = distr.gev.lmom_fit(x)
+#        mean = params['loc']
+#        std = params['scale']
+#        shape = params['c']
+#        return mean, std, shape

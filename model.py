@@ -243,16 +243,30 @@ class Seq2Seq(nn.Module):
         
         return predict, y_pred
 
-class SimpleRNN(nn.Module):
-    def __init__(self, target_length):
+class SimpleLSTM(nn.Module):
+    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, target_length):
         super().__init__()
-        self.rnn = nn.GRU(32, 32, batch_first=True)
-        self.dense_all = nn.Linear(15, 32)
-        self.out = nn.Linear(32, 1)
+        self.dense_all = nn.Linear(input_dim, emb_dim)
+        self.rnn = nn.LSTM(emb_dim, hid_dim, batch_first=True)
+        self.out = nn.Linear(hid_dim, output_dim)
         self.target_length = target_length 
 
     def forward(self, x):
         x = self.dense_all(x)
         latent, hidden = self.rnn(x)
-        output = self.out(latent[:, -self.target_length:])
+        output = self.out(latent[:, -1:])
+        return output 
+
+class SimpleGRU(nn.Module):
+    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, target_length):
+        super().__init__()
+        self.dense_all = nn.Linear(input_dim, emb_dim)
+        self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True)
+        self.out = nn.Linear(hid_dim, output_dim)
+        self.target_length = target_length 
+
+    def forward(self, x):
+        x = self.dense_all(x)
+        latent, hidden = self.rnn(x)
+        output = self.out(latent[:, -1:])
         return output 

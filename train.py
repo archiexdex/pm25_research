@@ -33,6 +33,13 @@ if os.path.exists(log_file):
         writer = csv.DictWriter(fp, fieldnames=field)
         writer.writeheader()
 
+mean_dict = {}
+std_dict = {}
+with open(opt.mean_path, "r") as fp:
+    mean_dict = json.load(fp)
+with open(opt.std_path, "r") as fp:
+    std_dict = json.load(fp)
+
 def update_model(loss_function, optimizer, output, target, retain_graph=False):
     loss = loss_function(output, target)
     optimizer.zero_grad()
@@ -41,8 +48,7 @@ def update_model(loss_function, optimizer, output, target, retain_graph=False):
     return loss
 
 ############ train model #############
-for name in sitenames:
-    sitename = name 
+for sitename in sitenames:
     if opt.skip_site and sitename not in sample_sites:
         continue 
     print(sitename)
@@ -50,6 +56,9 @@ for name in sitenames:
     valid_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=False)
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
+
+    mean = torch.tensor(mean_dict[sitename][7]).to(device)
+    std  = torch.tensor(std_dict[sitename][7]).to(device)
 
     if model_name == "fudan":
         model = Fudan(
@@ -91,6 +100,23 @@ for name in sitenames:
                     device=device,
                     dropout=opt.dropout,
                 )
+    elif model_name == 'gru':
+        model = SimpleGRU(
+                    input_dim=opt.input_dim,
+                    emb_dim=opt.emb_dim,
+                    output_dim=opt.output_dim,
+                    hid_dim=opt.hid_dim,
+                    target_length=opt.target_size,
+                )
+    elif model_name == 'lstm':
+        model = SimpleLSTM(
+                    input_dim=opt.input_dim,
+                    emb_dim=opt.emb_dim,
+                    output_dim=opt.output_dim,
+                    hid_dim=opt.hid_dim,
+                    target_length=opt.target_size,
+                )
+
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
     mse = nn.MSELoss()
@@ -99,6 +125,7 @@ for name in sitenames:
     total_epoch = opt.total_epoch
     patience = opt.patience
     best_loss = 1e9
+    best_rmse = 1e9
     earlystop_counter = 0
 
     for epoch in range(total_epoch):
@@ -131,6 +158,11 @@ for name in sitenames:
                 prediction = model(x, past_window, past_ext)
                 prediction_loss = mse(prediction, y)
                 loss = prediction_loss
+            elif model_name in ['gru', 'lstm']:
+                prediction = model(x)
+                prediction_loss = mse(prediction, y)
+                loss = prediction_loss
+
             # Update model
             optimizer.zero_grad()
             loss.backward()
@@ -145,6 +177,7 @@ for name in sitenames:
         train_loss = mean_prediction_loss / len(train_dataloader)
 
         mean_prediction_loss = 0
+        mean_rmse = 0
         model.eval()
         trange = tqdm(valid_dataloader)
         for idx, data in enumerate(trange):
@@ -157,16 +190,23 @@ for name in sitenames:
                 prediction, y_pred = model(x, past_window, past_ext)
             elif model_name in ["cnn", "unet"]:
                 prediction = model(x, past_window, past_ext)
+            elif model_name in ['gru', 'lstm']:
+                prediction = model(x)
             # Calculate loss
             prediction_loss = mse(prediction, y)
+            recover_mse = prediction_loss * std * std
+            recover_rmse = torch.sqrt(recover_mse)
             # Record loss
             mean_prediction_loss += prediction_loss.item()
+            mean_rmse += recover_rmse.item()
             # Show current record
-            trange.set_description(f"Validation mean loss prediction: {mean_prediction_loss / (idx+1):.6e}")
-        valid_loss = mean_prediction_loss / len(valid_dataloader) 
+            trange.set_description(f"Validation mean loss prediction: {mean_prediction_loss / (idx+1):.6e}, mean rmse: {mean_rmse / (idx+1):.4f}")
+        valid_loss = mean_prediction_loss / len(valid_dataloader)
+        valid_rmse = mean_rmse / len(valid_dataloader)
         
         if best_loss > valid_loss:
             best_loss = valid_loss 
+            best_rmse = valid_rmse
             torch.save(model.state_dict(), f"checkpoint.pt")
             earlystop_counter = 0
             print(">> Model saved!!")
@@ -184,6 +224,7 @@ for name in sitenames:
                     writer.writerow({
                         "sitename": sitename,
                         "best_loss": f"{best_loss:.6f}",
+                        "best_rmse": f"{best_rmse:.6f}",
                         "epoch": epoch,
                         "timestamp": datetime.now()
                     })

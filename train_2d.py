@@ -47,15 +47,18 @@ valid_dataset = PMMultiSiteDataset(sitenames=sample_sites, config=opt, isTrain=F
 train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
 valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
 
-model = CNN2DModel(
-            input_dim=opt.input_dim,
-            emb_dim=opt.emb_dim,
-            output_dim=opt.output_dim,
-            seq_len=opt.memory_size+opt.source_size,
-            trg_len=1,
-            device=device,
-            dropout=opt.dropout,
-        )
+if model in ['cnn2d']:
+    model = CNN2DModel(
+                input_dim=opt.input_dim,
+                emb_dim=opt.emb_dim,
+                output_dim=opt.output_dim,
+                seq_len=opt.memory_size+opt.source_size,
+                trg_len=1,
+                device=device,
+                dropout=opt.dropout,
+            )
+elif model in ['lstm2d', 'gru']:
+    
 model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
 mse = nn.MSELoss()

@@ -157,8 +157,8 @@ if __name__ == '__main__':
     train_mean, train_std, train_threshold = get_normalize(train_data.copy())
     
     # Concat train tail and valid, and all data
-    for key in train_data:
-        valid_data[key] = np.concatenate((train_data[key][-opt.memory_size:], valid_data[key]), axis=0)
+    #for key in train_data:
+    #    valid_data[key] = np.concatenate((train_data[key][-opt.memory_size:], valid_data[key]), axis=0)
 
     # Save file
     print("Save file")
