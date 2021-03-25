@@ -17,16 +17,17 @@ def add_arguments(parser):
     parser.add_argument('--lr',           type=float, default=1e-3, help='')
     parser.add_argument('--total_epoch',  type=int,   default=1000, help='')
     parser.add_argument('--patience',     type=int,   default=5,    help='')
-    parser.add_argument('--skip_site',    type=bool,  default=True, help='')
+    parser.add_argument('--skip_site',    action='store_true', help='')
     parser.add_argument('--ratio',        type=int,   default=2,    help='')
 
-    parser.add_argument('--memory_size',     type=int,   default=6570, help='The size of histry data')
-    parser.add_argument('--window_size',     type=int,   default=8,   help='The size of history data period, it only use in fudan model.')
-    parser.add_argument('--source_size',     type=int,   default=8,   help='The size of current data period.')
+    parser.add_argument('--memory_size',     type=int,   default=6570, help='The size of histry data 8760 for one year, 6570 for 9 months, 4380 for 6 months, 2160 for 3 months, 730 for 1 month')
+    parser.add_argument('--window_size',     type=int,   default=6,   help='The size of history data period, it only use in fudan model.')
+    parser.add_argument('--source_size',     type=int,   default=24,   help='The size of current data period.')
     parser.add_argument('--target_size',     type=int,   default=8,   help='')
     parser.add_argument('--threshold',       type=int,   default=70,  help='')
     parser.add_argument('--shuffle',         type=int,   default=1,   help='')
     parser.add_argument('--is_transform',    type=int,   default=1,   help='')
+    parser.add_argument('--use_ext',         action='store_true',   help='')
 
     parser.add_argument('--input_dim',       type=int,   default=16,  help='')
     parser.add_argument('--output_dim',      type=int,   default=1,   help='')
@@ -35,11 +36,16 @@ def add_arguments(parser):
     parser.add_argument('--dropout',         type=float, default=0.6, help='')
     parser.add_argument('--bidirectional',   type=bool,  default=False,  help='')
 
-
-    
-
     parser.add_argument('--origin_train_dir',       type=str,   default="data/origin/train",           help='')
     parser.add_argument('--origin_valid_dir',       type=str,   default="data/origin/valid",           help='')
+    parser.add_argument('--norm_train_dir',         type=str,   default="data/norm/train",             help='')
+    parser.add_argument('--norm_valid_dir',         type=str,   default="data/norm/valid",             help='')
+    parser.add_argument('--thres_train_dir',        type=str,   default="data/thres/train",             help='')
+    parser.add_argument('--thres_valid_dir',        type=str,   default="data/thres/valid",             help='')
+    parser.add_argument('--ext_train_dir',          type=str,   default="data/ext/train",             help='')
+    parser.add_argument('--ext_valid_dir',          type=str,   default="data/ext/valid",             help='')
+    parser.add_argument('--nonext_train_dir',       type=str,   default="data/nonext/train",             help='')
+    parser.add_argument('--nonext_valid_dir',       type=str,   default="data/nonext/valid",             help='')
     parser.add_argument('--mean_path',              type=str,   default="data/train_mean.json",        help='')
     parser.add_argument('--std_path',               type=str,   default="data/train_std.json",         help='')
     parser.add_argument('--threshold_path',         type=str,   default="data/train_threshold.json",   help='')

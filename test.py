@@ -10,6 +10,7 @@ from constants import *
 from model import * 
 from dataset import PMSingleSiteDataset 
 import pandas as pd
+from dotted.collection import DottedDict
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 opt = parse()
@@ -21,14 +22,15 @@ else:
     print("n is not a number")
     exit() 
 
+# Load arguments from train
+with open(f"{opt.config_dir}/{opt.no}.json", "r") as fp:
+   opt = json.load(fp)
+opt = DottedDict(opt)
+
 model_name = opt.model
 cpt_dir = get_path(opt.cpt_dir, f"{no}", mode=0)
 save_dir = opt.test_results_dir 
 save_dir = get_path(save_dir, f"{no}")
-
-if not os.path.exists(cpt_dir):
-    print("Are you kidding me??? (,,ﾟДﾟ)")
-    exit() 
 
 mean_dict = {}
 std_dict = {}
@@ -39,9 +41,10 @@ with open(opt.std_path, "r") as fp:
 
 name_list = []
 data_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
-for idx, name in enumerate(sample_sites):
-    sitename = name 
-    print(f"sitename: {name}")
+for sitename in sitenames:
+    if opt.skip_site == 1 and sitename not in sample_sites:
+        continue
+    print(f"sitename: {sitename}")
     valid_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=False)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
@@ -49,36 +52,8 @@ for idx, name in enumerate(sample_sites):
     std = std_dict[sitename][7]
 
     # Load model
-    if model_name == "fudan":
-        model = Fudan(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    device=device,
-                    dropout=opt.dropout,
-                    bidirectional=opt.bidirectional,
-                )
-    elif model_name == "seq2seq":
-        model = Seq2Seq(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    device=device,
-                    dropout=opt.dropout,
-                    bidirectional=opt.bidirectional,
-                )
-    elif model_name == "cnn":
-        model = CNNModel(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    seq_len=opt.memory_size+opt.source_size,
-                    trg_len=1,
-                    device=device,
-                    dropout=opt.dropout,
-                )
+    model = get_model(model_name, opt)
+    # Load checkpoint
     checkpoint = torch.load(os.path.join(cpt_dir, f"{sitename}.pt"))
     model.load_state_dict(checkpoint) 
     model.to(device)
@@ -87,33 +62,37 @@ for idx, name in enumerate(sample_sites):
     predict_list = None 
     true_list = None
     pred_list = None
-    sum_loss = 0
+    mean_loss = 0
+    mean_rmse = 0
     model.eval()
     trange = tqdm(valid_dataloader)
     for idx, data in enumerate(trange):
         # get data
-        x, y, y_ext, past_window, past_ext, y_thres = map(lambda z: z.to(device), data)
+        x, y, y_ext, past_window, past_ext, xy_thres = map(lambda z: z.to(device), data)
+        y_thres = xy_thres[:, -1]
         # get loss & update
         if model_name == "fudan":
             _, y_pred, output = model(x, past_window, past_ext)
         elif model_name == "seq2seq":
             output, y_pred = model(x, past_window, past_ext)
-        elif model_name == "cnn":
+        elif model_name in ["cnn", "unet", "gru", "lstm", "dnn"]:
             output = model(x, past_window, past_ext)
-        loss = criterion(output, y)
-        sum_loss += loss.item()
+        loss = criterion(output, y[:, -1])
+        mse_loss = criterion(output * y_thres, y[:, -1] * y_thres)
+        mean_loss += loss.item()
+        mean_rmse += torch.sqrt(mse_loss)
         # Denorm the data
-        x = x.cpu().numpy() * std + mean
-        y = y.cpu().numpy() * std + mean
-        output = output.cpu().detach().numpy() * std + mean 
-        y_ext = y_ext.cpu().numpy()
-        y_thres = y_thres.cpu().numpy()
+        x = (x * xy_thres[:, :opt.source_size]).cpu().numpy()
+        y = (y * xy_thres[:, opt.source_size:]).cpu().numpy()
+        output = (output * xy_thres[:, -1]).cpu().detach().numpy()
+        y_ext = y_ext[:, -1].cpu().numpy()
+        xy_thres = xy_thres.cpu().numpy()
         if model_name in ["fudan", "seq2seq"]:
             y_pred = y_pred.cpu().detach().numpy() 
         else:
             y_pred = np.zeros(output.shape)
-        y_pred[output > y_thres] = 1
-        y_pred[output <= y_thres] = 0
+        y_thres = y_thres.cpu().numpy()
+        y_pred[output >= y_thres] = 1
         # append result
         if predict_list is None:
             predict_list = output
@@ -123,11 +102,12 @@ for idx, name in enumerate(sample_sites):
             predict_list = np.concatenate((predict_list, output), axis=0)
             true_list   = np.concatenate((true_list, y_ext), axis=0)
             pred_list   = np.concatenate((pred_list, y_pred), axis=0)
-        trange.set_description(f"testing mean loss: {sum_loss / (idx+1):.4f}")
+        trange.set_description(f"testing mean loss: {mean_loss / (idx+1):.4f}, rmse: {mean_rmse / (idx+1):.4f}")
     # summery value
-    valid_loss = sum_loss / len(valid_dataloader) 
+    valid_loss = mean_loss / len(valid_dataloader) 
     true_list = np.squeeze(true_list)
     pred_list = np.squeeze(pred_list)
+    #print(true_list.shape, pred_list.shape)
     #print(predict_list.max(), predict_list.min())
     #print(y_thres.max(), y_thres.min())
     #print(true_list.max(), true_list.min())

@@ -243,6 +243,21 @@ class Seq2Seq(nn.Module):
         
         return predict, y_pred
 
+class SimpleLSTM2d(nn.Module):
+    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, target_length):
+        super().__init__()
+        self.dense_all = nn.Linear(input_dim, emb_dim)
+        self.rnn = nn.LSTM(emb_dim, hid_dim, batch_first=True)
+        self.out = nn.Linear(hid_dim, output_dim)
+        self.target_length = target_length 
+
+    def forward(self, x, past_window, past_ext):
+        x = torch.cat((past_window, x), dim=-1)
+        x = self.dense_all(x)
+        latent, hidden = self.rnn(x)
+        output = self.out(latent[:, :, -1:])
+        return output 
+
 class SimpleLSTM(nn.Module):
     def __init__(self, input_dim, emb_dim, hid_dim, output_dim, target_length):
         super().__init__()
@@ -251,10 +266,11 @@ class SimpleLSTM(nn.Module):
         self.out = nn.Linear(hid_dim, output_dim)
         self.target_length = target_length 
 
-    def forward(self, x):
+    def forward(self, x, past_window, past_ext):
+        x = torch.cat((past_window, x), dim=1)
         x = self.dense_all(x)
         latent, hidden = self.rnn(x)
-        output = self.out(latent[:, -1:])
+        output = self.out(latent[:, -1])
         return output 
 
 class SimpleGRU(nn.Module):
@@ -265,8 +281,24 @@ class SimpleGRU(nn.Module):
         self.out = nn.Linear(hid_dim, output_dim)
         self.target_length = target_length 
 
-    def forward(self, x):
+    def forward(self, x, past_window, past_ext):
+        x = torch.cat((past_window, x), dim=1)
         x = self.dense_all(x)
         latent, hidden = self.rnn(x)
-        output = self.out(latent[:, -1:])
+        output = self.out(latent[:, -1])
         return output 
+
+class SimpleDNN(nn.Module):
+    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, target_length):
+        super().__init__()
+        self.dense_emb = nn.Linear(input_dim, emb_dim)
+        self.dense_hid = nn.Linear(emb_dim, hid_dim)
+        self.dense_out = nn.Linear(hid_dim, output_dim)
+        self.relu = nn.ReLU(True)
+
+    def forward(self, x, past_window, past_ext):
+        x = torch.cat((past_window, x), dim=1)
+        x = self.relu(self.dense_emb(x))
+        x = self.relu(self.dense_hid(x))
+        x = self.relu(self.dense_out(x))[:, -1]
+        return x 

@@ -49,7 +49,7 @@ def update_model(loss_function, optimizer, output, target, retain_graph=False):
 
 ############ train model #############
 for sitename in sitenames:
-    if opt.skip_site and sitename not in sample_sites:
+    if opt.skip_site == 1 and sitename not in sample_sites:
         continue 
     print(sitename)
     train_dataset = PMSingleSiteDataset(sitename=sitename, config=opt, isTrain=True)
@@ -59,63 +59,72 @@ for sitename in sitenames:
 
     mean = torch.tensor(mean_dict[sitename][7]).to(device)
     std  = torch.tensor(std_dict[sitename][7]).to(device)
-
-    if model_name == "fudan":
-        model = Fudan(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    device=device,
-                    dropout=opt.dropout,
-                    bidirectional=opt.bidirectional,
-                )
-    elif model_name == "seq2seq":
-        model = Seq2Seq(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    device=device,
-                    dropout=opt.dropout,
-                    bidirectional=opt.bidirectional,
-                )
-    elif model_name == "cnn":
-        model = CNNModel(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    seq_len=opt.memory_size+opt.source_size,
-                    trg_len=1,
-                    device=device,
-                    dropout=opt.dropout,
-                )
-    elif model_name == 'unet':
-        model = UNET(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    seq_len=opt.memory_size+opt.source_size,
-                    trg_len=1,
-                    device=device,
-                    dropout=opt.dropout,
-                )
-    elif model_name == 'gru':
-        model = SimpleGRU(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    target_length=opt.target_size,
-                )
-    elif model_name == 'lstm':
-        model = SimpleLSTM(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    target_length=opt.target_size,
-                )
+    
+    model = get_model(model_name, opt)
+#    if model_name == "fudan":
+#        model = Fudan(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                    bidirectional=opt.bidirectional,
+#                )
+#    elif model_name == "seq2seq":
+#        model = Seq2Seq(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                    bidirectional=opt.bidirectional,
+#                )
+#    elif model_name == "cnn":
+#        model = CNNModel(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    seq_len=opt.memory_size+opt.source_size,
+#                    trg_len=1,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                )
+#    elif model_name == 'unet':
+#        model = UNET(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    seq_len=opt.memory_size+opt.source_size,
+#                    trg_len=1,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                )
+#    elif model_name == 'gru':
+#        model = SimpleGRU(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    target_length=opt.target_size,
+#                )
+#    elif model_name == 'lstm':
+#        model = SimpleLSTM(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    target_length=opt.target_size,
+#                )
+#    elif model_name == 'dnn':
+#        model = SimpleDNN(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    target_length=opt.target_size,
+#                )
 
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
@@ -127,6 +136,7 @@ for sitename in sitenames:
     best_loss = 1e9
     best_rmse = 1e9
     earlystop_counter = 0
+    st_time = datetime.now()
 
     for epoch in range(total_epoch):
         print(f">>Epoch: {epoch}\n")
@@ -158,9 +168,9 @@ for sitename in sitenames:
                 prediction = model(x, past_window, past_ext)
                 prediction_loss = mse(prediction, y)
                 loss = prediction_loss
-            elif model_name in ['gru', 'lstm']:
-                prediction = model(x)
-                prediction_loss = mse(prediction, y)
+            elif model_name in ['gru', 'lstm', 'dnn']:
+                prediction = model(x, past_window, past_ext)
+                prediction_loss = mse(prediction, y[:, -1])
                 loss = prediction_loss
 
             # Update model
@@ -182,7 +192,8 @@ for sitename in sitenames:
         trange = tqdm(valid_dataloader)
         for idx, data in enumerate(trange):
             # get data
-            x, y, y_ext, past_window, past_ext, _ = map(lambda x: x.to(device), data)
+            x, y, y_ext, past_window, past_ext, xy_thres = map(lambda x: x.to(device), data)
+            y_thres = xy_thres[:, -1]
             # get loss & update
             if model_name == "fudan":
                 _, y_pred, prediction = model(x, past_window, past_ext)
@@ -190,12 +201,12 @@ for sitename in sitenames:
                 prediction, y_pred = model(x, past_window, past_ext)
             elif model_name in ["cnn", "unet"]:
                 prediction = model(x, past_window, past_ext)
-            elif model_name in ['gru', 'lstm']:
-                prediction = model(x)
+            elif model_name in ['gru', 'lstm', 'dnn']:
+                prediction = model(x, past_window, past_ext)
             # Calculate loss
-            prediction_loss = mse(prediction, y)
-            recover_mse = prediction_loss * std * std
-            recover_rmse = torch.sqrt(recover_mse)
+            prediction_loss = mse(prediction, y[:, -1])
+            mse_loss = mse(prediction * y_thres, y[:, -1] * y_thres)
+            recover_rmse = torch.sqrt(mse_loss)
             # Record loss
             mean_prediction_loss += prediction_loss.item()
             mean_rmse += recover_rmse.item()
@@ -216,7 +227,7 @@ for sitename in sitenames:
             earlystop_counter += 1
             if earlystop_counter >= patience:
                 print("Early stop!!!")
-                print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.6f}")
+                print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss:.6f}, best_rmse: {best_rmse: .4f}")
                 os.rename("checkpoint.pt", os.path.join(cpt_dir, f"{sitename}.pt"))
                 # write log
                 with open(log_file, "a", newline='') as fp:
@@ -226,6 +237,6 @@ for sitename in sitenames:
                         "best_loss": f"{best_loss:.6f}",
                         "best_rmse": f"{best_rmse:.6f}",
                         "epoch": epoch,
-                        "timestamp": datetime.now()
+                        "timestamp": datetime.now() - st_time
                     })
                 break

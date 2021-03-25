@@ -33,6 +33,13 @@ if os.path.exists(log_file):
         writer = csv.DictWriter(fp, fieldnames=field)
         writer.writeheader()
 
+mean_dict = {}
+std_dict = {}
+with open(opt.mean_path, "r") as fp:
+    mean_dict = json.load(fp)
+with open(opt.std_path, "r") as fp:
+    std_dict = json.load(fp)
+
 def update_model(loss_function, optimizer, output, target, retain_graph=False):
     loss = loss_function(output, target)
     optimizer.zero_grad()
@@ -46,8 +53,10 @@ train_dataset = PMMultiSiteDataset(sitenames=sample_sites, config=opt, isTrain=T
 valid_dataset = PMMultiSiteDataset(sitenames=sample_sites, config=opt, isTrain=False)
 train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
 valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
+mean = torch.tensor([mean_dict[s][7] for s in sample_sites]).to(device)
+std  = torch.tensor([std_dict[s][7] for s in sample_sites]).to(device)
 
-if model in ['cnn2d']:
+if model_name in ['cnn2d']:
     model = CNN2DModel(
                 input_dim=opt.input_dim,
                 emb_dim=opt.emb_dim,
@@ -57,7 +66,14 @@ if model in ['cnn2d']:
                 device=device,
                 dropout=opt.dropout,
             )
-elif model in ['lstm2d', 'gru']:
+elif model_name in ['lstm2d', 'gru2d']:
+    model = SimpleLSTM2d(
+                input_dim=opt.input_dim,
+                emb_dim=opt.emb_dim,
+                output_dim=opt.output_dim,
+                hid_dim=opt.hid_dim,
+                target_length=opt.target_size,
+            )
     
 model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
@@ -67,6 +83,7 @@ bce = nn.BCEWithLogitsLoss()
 total_epoch = opt.total_epoch
 patience = opt.patience
 best_loss = 1e9
+best_rmse = 1e9
 earlystop_counter = 0
 
 for epoch in range(total_epoch):
@@ -93,6 +110,7 @@ for epoch in range(total_epoch):
     train_loss = mean_prediction_loss / len(train_dataloader)
 
     mean_prediction_loss = 0
+    mean_rmse = 0
     model.eval()
     trange = tqdm(valid_dataloader)
     for idx, data in enumerate(trange):
@@ -102,14 +120,18 @@ for epoch in range(total_epoch):
         prediction = model(x, past_window, past_ext)
         # Calculate loss
         prediction_loss = mse(prediction, y)
+        recover_rmse = prediction_loss * std * std
         # Record loss
         mean_prediction_loss += prediction_loss.item()
+        mean_rmse += recover_rmse.item()
         # Show current record
-        trange.set_description(f"Validation mean loss prediction: {mean_prediction_loss / (idx+1):.6e}")
+        trange.set_description(f"Validation mean loss prediction: {mean_prediction_loss / (idx+1):.6e}, rmse: {mean_rmse / (idx+1):.4f}")
     valid_loss = mean_prediction_loss / len(valid_dataloader) 
+    valid_rmse = mean_rmse / len(valid_dataloader) 
     
     if best_loss > valid_loss:
         best_loss = valid_loss 
+        best_rmse = valid_rmse
         torch.save(model.state_dict(), f"checkpoint.pt")
         earlystop_counter = 0
         print(">> Model saved!!")
@@ -126,6 +148,7 @@ for epoch in range(total_epoch):
                 writer = csv.DictWriter(fp, fieldnames=field)
                 writer.writerow({
                     "best_loss": f"{best_loss:.6f}",
+                    "best_rmse": f"{best_rmse:.4f}",
                     "epoch": epoch,
                     "timestamp": datetime.now()
                 })
