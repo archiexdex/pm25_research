@@ -167,8 +167,8 @@ def pm25_to_AQI(x):
 if __name__ == '__main__':
     # Read data
     print("read data & filter feature")
-    #print("All...")
-    #all_data = read_csv("all")
+    print("All...")
+    all_data = read_csv("all")
     print("Train...")
     train_data = read_csv("train")
     print("Valid...")
@@ -209,7 +209,7 @@ if __name__ == '__main__':
     except:
         shutil.rmtree("data/thres")
         os.mkdir("data/thres")
-    #os.mkdir("data/origin/all")
+    os.mkdir("data/origin/all")
     os.mkdir("data/origin/train")
     os.mkdir("data/origin/valid")
     os.mkdir("data/norm/train")
@@ -218,7 +218,7 @@ if __name__ == '__main__':
     os.mkdir("data/thres/valid")
     
     for key in train_data:
-        #np.save(f"data/origin/all/{key}.npy",   all_data[key])
+        np.save(f"data/origin/all/{key}.npy",   all_data[key])
         np.save(f"data/origin/train/{key}.npy", train_data[key])
         np.save(f"data/origin/valid/{key}.npy", valid_data[key])
         np.save(f"data/norm/train/{key}.npy",   train_norm[key])

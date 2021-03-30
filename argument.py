@@ -36,6 +36,7 @@ def add_arguments(parser):
     parser.add_argument('--dropout',         type=float, default=0.6, help='')
     parser.add_argument('--bidirectional',   type=bool,  default=False,  help='')
 
+    parser.add_argument('--origin_all_dir',       type=str,   default="data/origin/all",           help='')
     parser.add_argument('--origin_train_dir',       type=str,   default="data/origin/train",           help='')
     parser.add_argument('--origin_valid_dir',       type=str,   default="data/origin/valid",           help='')
     parser.add_argument('--norm_train_dir',         type=str,   default="data/norm/train",             help='')
