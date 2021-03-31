@@ -10,6 +10,7 @@ def add_arguments(parser):
     '''
     parser.add_argument("--no",           type=int,                 help="the index of training process")
     parser.add_argument("--model",        type=str,                 help="model name")
+    parser.add_argument("--method",       type=str,                 help="method name")
     parser.add_argument("--seed",         type=int,   default=9487, help="seed for random number")
     parser.add_argument('--display_freq', type=int,   default=10,   help='display frequency for training')
     parser.add_argument('--gamma',        type=float, default=0.99, help='constant parameter')
@@ -33,8 +34,9 @@ def add_arguments(parser):
     parser.add_argument('--output_dim',      type=int,   default=1,   help='')
     parser.add_argument('--emb_dim',         type=int,   default=32,  help='')
     parser.add_argument('--hid_dim',         type=int,   default=32,  help='')
+    parser.add_argument('--num_layers',      type=int,   default=2,  help='')
     parser.add_argument('--dropout',         type=float, default=0.6, help='')
-    parser.add_argument('--bidirectional',   type=bool,  default=False,  help='')
+    parser.add_argument('--bidirectional',   action='store_true',  default=True,  help='')
 
     parser.add_argument('--origin_all_dir',         type=str,   default="../data/origin/all",           help='')
     parser.add_argument('--origin_train_dir',       type=str,   default="../data/origin/train",           help='')

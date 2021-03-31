@@ -27,18 +27,6 @@ log_dir = get_path(opt.log_dir, mode=0)
 
 device = get_device()
 
-def get_model(path):
-    checkpoint = torch.load(path)
-    model = DNN(
-        input_dim=opt.input_dim, 
-        emb_dim=opt.emb_dim, 
-        hid_dim=opt.hid_dim, 
-        output_dim=opt.output_dim,
-        source_size=opt.source_size
-    )
-    model.load_state_dict(checkpoint)
-    return model
-
 train_records = {}
 for sitename in sitenames:
     if opt.skip_site == 1 and sitename not in sample_sites:
@@ -52,13 +40,26 @@ for sitename in sitenames:
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
     
-    model = DNN(
-        input_dim=opt.input_dim, 
-        emb_dim=opt.emb_dim, 
-        hid_dim=opt.hid_dim, 
-        output_dim=opt.output_dim,
-        source_size=opt.source_size
-    ).to(device)
+    if opt.model == "dnn":
+        model = DNN(
+            input_dim   = opt.input_dim, 
+            emb_dim     = opt.emb_dim, 
+            hid_dim     = opt.hid_dim, 
+            output_dim  = opt.output_dim,
+            source_size = opt.source_size
+        ).to(device)
+    elif opt.model == "gru":
+        model = GRU(
+            input_dim     = opt.input_dim, 
+            emb_dim       = opt.emb_dim, 
+            hid_dim       = opt.hid_dim, 
+            output_dim    = opt.output_dim,
+            source_size   = opt.source_size,
+            dropout       = opt.dropout,
+            num_layers    = opt.num_layers,
+            bidirectional = opt.bidirectional
+        ).to(device)
+
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     mse = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()

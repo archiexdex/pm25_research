@@ -1,9 +1,35 @@
+from utils import *
+from constants import *
+from tqdm import tqdm
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
+from datetime import datetime
+from dataset import PMDataset
+import csv, json
+import pandas as pd
+from dotted.collection import DottedDict
+
 # Test
-save_dir = opt.test_results_dir
-save_dir = get_path(save_dir, f"{no}")
+opt = parse()
+
+no = opt.no
+method = opt.method
+model_name = opt.model
+
+same_seeds(opt.seed)
+cpt_dir = get_path(opt.cpt_dir, f"{no}", mode=0)
+save_dir = get_path(opt.test_results_dir, mode=0)
+save_dir = get_path(save_dir, f"{no}_{method}")
+
+
+device = get_device()
+#with open(f"{opt.config_dir}/{opt.no}.json", "r") as fp:
+#    opt = json.load(fp)
+#opt = DottedDict(opt)
 
 name_list = []
-data_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
+data_list = {"rmse": [], "f1": [], "micro": [], "macro": [], "weighted": []}
 for sitename in sitenames:
     if opt.skip_site == 1 and sitename not in sample_sites:
         continue
@@ -11,20 +37,24 @@ for sitename in sitenames:
     test_dataset    = PMDataset(sitename=sitename, config=opt, isTrain=False)
     test_dataloader = DataLoader(test_dataset, batch_size=opt.batch_size, shuffle=False)
     
-    ext_model = get_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"))
-    nor_model = get_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"))
-    # MARK: - learnable model or fronzen?
-    ext_model.eval()
-    nor_model.eval()
-    
-    model = DNN_merged(
-        ext_model=ext_model, 
-        nor_model=nor_model,
-        output_dim=opt.output_dim,
-    )
-    checkpoint = torch.load(os.path.join(cpt_dir, f"{sitename}.pt"))
-    model.load_state_dict(checkpoint)
-    model.to(device)
+    if method == "all":
+        model = get_model(os.path.join(cpt_dir, f"{sitename}_all.pt"), model_name, opt).to(device)
+    elif method == "merged":
+        ext_model = get_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"), model_name, opt).to(device)
+        nor_model = get_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"),  model_name, opt).to(device)
+        # MARK: - learnable model or fronzen?
+        ext_model.eval()
+        nor_model.eval()
+        
+        model = DNN_merged(
+            ext_model=ext_model, 
+            nor_model=nor_model,
+            output_dim=opt.output_dim,
+        )
+        checkpoint = torch.load(os.path.join(cpt_dir, f"{sitename}_merged.pt"))
+        model.load_state_dict(checkpoint)
+        model.to(device)
+
     model.eval()
     mse = nn.MSELoss()
 
@@ -64,11 +94,12 @@ for sitename in sitenames:
             pred_list  = np.concatenate((pred_list, y_pred), axis=0)
             true_list  = np.concatenate((true_list, y_true), axis=0)
             value_list = np.concatenate((value_list, recover_y), axis=0)
-        trange.set_description(f"Test mean rmse: {mean_rmse_loss / (idx+1):.3e}")
+        trange.set_description(f"Test mean rmse: {mean_rmse_loss / (idx+1):.3f}")
     test_loss = mean_rmse_loss / len(test_dataloader)
     
     f1, macro, micro, weighted = get_score(true_list, pred_list)
     name_list.append(sitename)
+    data_list["rmse"].append(test_loss)
     data_list["f1"].append(f1); data_list["macro"].append(macro)
     data_list["micro"].append(micro); data_list["weighted"].append(weighted)
 #     print(f"f1: {f1}, macro: {macro}, micro: {micro}, weighted: {weighted}")
@@ -77,9 +108,10 @@ for sitename in sitenames:
 # save quantitative analysis
 df = pd.DataFrame({
     "sitename": name_list,
+    "rmse":     data_list["rmse"],
     "f1":       data_list["f1"],
     "micro":    data_list["micro"],
     "macro":    data_list["macro"],
     "weighted": data_list["weighted"]
 })
-df.to_csv(f"{save_dir}/{no}.csv", index=False, encoding='utf_8_sig')
+df.to_csv(f"{save_dir}/{no}_{method}.csv", index=False, encoding='utf_8_sig')

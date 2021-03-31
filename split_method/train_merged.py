@@ -26,18 +26,6 @@ log_dir = get_path(opt.log_dir, mode=0)
 
 device = get_device()
 
-def get_model(path):
-    checkpoint = torch.load(path)
-    model = DNN(
-        input_dim=opt.input_dim, 
-        emb_dim=opt.emb_dim, 
-        hid_dim=opt.hid_dim, 
-        output_dim=opt.output_dim,
-        source_size=opt.source_size
-    )
-    model.load_state_dict(checkpoint)
-    return model
-
 train_records = {}
 for sitename in sitenames:
     if opt.skip_site == 1 and sitename not in sample_sites:
@@ -50,8 +38,8 @@ for sitename in sitenames:
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
-    ext_model = get_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"))
-    nor_model = get_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"))
+    ext_model = get_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"), opt.model).to(device)
+    nor_model = get_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"),  opt.model).to(device)
     # MARK: - learnable model or fronzen?
     ext_model.eval()
     nor_model.eval()

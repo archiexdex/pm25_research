@@ -9,7 +9,7 @@ from sklearn.metrics import f1_score, precision_score
 from model import *
 from tqdm import tqdm
 import csv
-torch.autograd.set_detect_anomaly(True)
+#torch.autograd.set_detect_anomaly(True)
 
 def get_device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,6 +68,30 @@ def test(model, dataloader, criterion):
         trange.set_description(f"Validation mean rmse: {mean_rmse_loss / (idx+1):.3f}")
     valid_loss = mean_rmse_loss / len(dataloader)
     return valid_loss
+
+def get_model(path, name, opt):
+    checkpoint = torch.load(path)
+    if name == "dnn":
+        model = DNN(
+            input_dim=opt.input_dim, 
+            emb_dim=opt.emb_dim, 
+            hid_dim=opt.hid_dim, 
+            output_dim=opt.output_dim,
+            source_size=opt.source_size
+        )
+    elif name == "gru":
+        model = GRU(
+            input_dim     = opt.input_dim, 
+            emb_dim       = opt.emb_dim, 
+            hid_dim       = opt.hid_dim, 
+            output_dim    = opt.output_dim,
+            source_size   = opt.source_size,
+            dropout       = opt.dropout,
+            num_layers    = opt.num_layers,
+            bidirectional = opt.bidirectional
+        )
+    model.load_state_dict(checkpoint)
+    return model
 
 def write_record(path, records):
     header = ["sitename", "mode", "best_rmse", "epoch", "cost_time"]
@@ -130,69 +154,69 @@ def get_score(y_true, y_pred):
     weighted = f1_score(y_true, y_pred, average='weighted')
     return f1, macro, micro, weighted
 
-def get_model(name, opt):
-    if name == "fudan":
-        model = Fudan(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    device=device,
-                    dropout=opt.dropout,
-                    bidirectional=opt.bidirectional,
-                )
-    elif name == "seq2seq":
-        model = Seq2Seq(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    device=device,
-                    dropout=opt.dropout,
-                    bidirectional=opt.bidirectional,
-                )
-    elif name == "cnn":
-        model = CNNModel(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    seq_len=opt.memory_size+opt.source_size,
-                    trg_len=1,
-                    device=device,
-                    dropout=opt.dropout,
-                )
-    elif name == 'unet':
-        model = UNET(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    seq_len=opt.memory_size+opt.source_size,
-                    trg_len=1,
-                    device=device,
-                    dropout=opt.dropout,
-                )
-    elif name == 'gru':
-        model = SimpleGRU(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    target_length=opt.target_size,
-                )
-    elif name == 'lstm':
-        model = SimpleLSTM(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    target_length=opt.target_size,
-                )
-    elif name == 'dnn':
-        model = SimpleDNN(
-                    input_dim=opt.input_dim,
-                    emb_dim=opt.emb_dim,
-                    output_dim=opt.output_dim,
-                    hid_dim=opt.hid_dim,
-                    target_length=opt.target_size,
-                )
-    return model
+#def get_model(name, opt):
+#    if name == "fudan":
+#        model = Fudan(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                    bidirectional=opt.bidirectional,
+#                )
+#    elif name == "seq2seq":
+#        model = Seq2Seq(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                    bidirectional=opt.bidirectional,
+#                )
+#    elif name == "cnn":
+#        model = CNNModel(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    seq_len=opt.memory_size+opt.source_size,
+#                    trg_len=1,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                )
+#    elif name == 'unet':
+#        model = UNET(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    seq_len=opt.memory_size+opt.source_size,
+#                    trg_len=1,
+#                    device=device,
+#                    dropout=opt.dropout,
+#                )
+#    elif name == 'gru':
+#        model = SimpleGRU(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    target_length=opt.target_size,
+#                )
+#    elif name == 'lstm':
+#        model = SimpleLSTM(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    target_length=opt.target_size,
+#                )
+#    elif name == 'dnn':
+#        model = SimpleDNN(
+#                    input_dim=opt.input_dim,
+#                    emb_dim=opt.emb_dim,
+#                    output_dim=opt.output_dim,
+#                    hid_dim=opt.hid_dim,
+#                    target_length=opt.target_size,
+#                )
+#    return model

@@ -37,14 +37,27 @@ for sitename in sitenames:
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
-    ext_model = DNN(
-        input_dim=opt.input_dim, 
-        emb_dim=opt.emb_dim, 
-        hid_dim=opt.hid_dim, 
-        output_dim=opt.output_dim,
-        source_size=opt.source_size
-    ).to(device)
-    optimizer = optim.Adam(ext_model.parameters(), lr=opt.lr)
+    if opt.model == "dnn":
+        model = DNN(
+            input_dim   = opt.input_dim, 
+            emb_dim     = opt.emb_dim, 
+            hid_dim     = opt.hid_dim, 
+            output_dim  = opt.output_dim,
+            source_size = opt.source_size
+        ).to(device)
+    elif opt.model == "gru":
+        model = GRU(
+            input_dim     = opt.input_dim, 
+            emb_dim       = opt.emb_dim, 
+            hid_dim       = opt.hid_dim, 
+            output_dim    = opt.output_dim,
+            source_size   = opt.source_size,
+            dropout       = opt.dropout,
+            num_layers    = opt.num_layers,
+            bidirectional = opt.bidirectional
+        ).to(device)
+
+    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     mse = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()
 
@@ -55,11 +68,11 @@ for sitename in sitenames:
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = train(ext_model, train_dataloader, mse, optimizer)
-        valid_loss = test(ext_model, valid_dataloader, mse)
+        train_loss = train(model, train_dataloader, mse, optimizer)
+        valid_loss = test (model, valid_dataloader, mse)
         if best_rmse > valid_loss:
             best_rmse = valid_loss
-            torch.save(ext_model.state_dict(), f"checkpoint.pt")
+            torch.save(model.state_dict(), f"checkpoint.pt")
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")
 
