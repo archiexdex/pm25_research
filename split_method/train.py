@@ -1,4 +1,5 @@
 from utils import *
+from custom_loss import *
 from constants import *
 from tqdm import tqdm
 import torch
@@ -9,11 +10,10 @@ from datetime import datetime
 from dataset import PMExtDataset, PMDataset
 import csv
 
-
 # Train
 opt = parse()
 same_seeds(opt.seed)
-save_config(opt, opt.config_dir, str(opt.no))
+save_config(opt, opt.config_dir, str(opt.no), opt.method)
 
 if opt.no is not None:
     no = opt.no
@@ -33,36 +33,40 @@ for sitename in sitenames:
         continue
     print(sitename)
     
-    # train combine all 
-    train_dataset = PMDataset(sitename=sitename, config=opt, isTrain=True)
-    valid_dataset = PMDataset(sitename=sitename, config=opt, isTrain=False)
+    # Dataset
+    if opt.method in ["all", "merged"]:
+        train_dataset = PMDataset(sitename=sitename, config=opt, isTrain=True)
+        valid_dataset = PMDataset(sitename=sitename, config=opt, isTrain=False)
+    elif opt.method == "extreme":
+        train_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=True, isTrain=True)
+        valid_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=True, isTrain=False)
+    elif opt.method == "normal":
+        train_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=False, isTrain=True)
+        valid_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=False, isTrain=False)
+
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
-    
-    if opt.model == "dnn":
-        model = DNN(
-            input_dim   = opt.input_dim, 
-            emb_dim     = opt.emb_dim, 
-            hid_dim     = opt.hid_dim, 
-            output_dim  = opt.output_dim,
-            source_size = opt.source_size
+    # Model
+    if opt.method == "merged":
+        ext_model = load_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"), opt.model, opt).to(device)
+        nor_model = load_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"),  opt.model, opt).to(device)
+        # MARK: - learnable model or fronzen?
+        ext_model.eval()
+        nor_model.eval()
+        
+        model = DNN_merged(
+            ext_model=ext_model, 
+            nor_model=nor_model,
+            output_dim=opt.output_dim,
         ).to(device)
-    elif opt.model == "gru":
-        model = GRU(
-            input_dim     = opt.input_dim, 
-            emb_dim       = opt.emb_dim, 
-            hid_dim       = opt.hid_dim, 
-            output_dim    = opt.output_dim,
-            source_size   = opt.source_size,
-            dropout       = opt.dropout,
-            num_layers    = opt.num_layers,
-            bidirectional = opt.bidirectional
-        ).to(device)
+    else:
+        model = get_model(opt.model, opt).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     mse = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()
+    criterion = EXTLoss() 
 
     total_epoch = opt.total_epoch
     patience = opt.patience
@@ -71,8 +75,8 @@ for sitename in sitenames:
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = train(model, train_dataloader, mse, optimizer)
-        valid_loss = test(model, valid_dataloader, mse)
+        train_loss = train(model, train_dataloader, criterion, optimizer)
+        valid_loss = test(model, valid_dataloader, criterion)
         if best_rmse > valid_loss:
             best_rmse = valid_loss
             torch.save(model.state_dict(), f"checkpoint.pt")
@@ -85,17 +89,16 @@ for sitename in sitenames:
             if earlystop_counter >= patience:
                 print("Early stop!!!")
                 print(f"sitename: {sitename}\nepoch: {epoch}\nbest_rmse: {best_rmse: .4f}")
-                os.rename("checkpoint.pt", os.path.join(cpt_dir, f"{sitename}_all.pt"))
+                os.rename("checkpoint.pt", os.path.join(cpt_dir, f"{sitename}_{opt.method}.pt"))
                 train_records[sitename] = {
-                    "mode": "all",
+                    "mode": opt.method,
                     "best_rmse": f"{best_rmse:.3f}", 
                     "epoch": epoch, 
                     "timestamp": datetime.now() - st_time
                 }
                 break
 
-
 # Write Record
-write_record(f"{opt.log_dir}/{no}_all.csv", train_records)
+write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
 
 print("Done!!!")

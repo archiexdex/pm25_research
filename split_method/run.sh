@@ -1,8 +1,8 @@
 echo "train all"
-python train_all.py    --no=$1 
+python train.py --no=$1 --model=$2 --method=all
 echo "train extreme"
-python train_ext.py    --no=$1
+python train.py --no=$1 --model=$2 --method=extreme
 echo "train normal"
-python train_normal.py --no=$1
+python train.py --no=$1 --model=$2 --method=normal
 echo "train merged"
-python train_merged.py --no=$1
+python train.py --no=$1 --model=$2 --method=merged

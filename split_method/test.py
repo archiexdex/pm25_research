@@ -38,10 +38,10 @@ for sitename in sitenames:
     test_dataloader = DataLoader(test_dataset, batch_size=opt.batch_size, shuffle=False)
     
     if method == "all":
-        model = get_model(os.path.join(cpt_dir, f"{sitename}_all.pt"), model_name, opt).to(device)
+        model = load_model(os.path.join(cpt_dir, f"{sitename}_all.pt"), model_name, opt).to(device)
     elif method == "merged":
-        ext_model = get_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"), model_name, opt).to(device)
-        nor_model = get_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"),  model_name, opt).to(device)
+        ext_model = load_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"), model_name, opt).to(device)
+        nor_model = load_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"),  model_name, opt).to(device)
         # MARK: - learnable model or fronzen?
         ext_model.eval()
         nor_model.eval()
