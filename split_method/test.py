@@ -19,7 +19,7 @@ model_name = opt.model
 
 same_seeds(opt.seed)
 cpt_dir = get_path(opt.cpt_dir, f"{no}", mode=0)
-save_dir = get_path(opt.test_results_dir, mode=0)
+save_dir = get_path(opt.results_dir, mode=0)
 save_dir = get_path(save_dir, f"{no}_{method}")
 
 
@@ -49,7 +49,9 @@ for sitename in sitenames:
         model = DNN_merged(
             ext_model=ext_model, 
             nor_model=nor_model,
+            input_dim=opt.input_dim,
             output_dim=opt.output_dim,
+            source_size=opt.source_size,
         )
         checkpoint = torch.load(os.path.join(cpt_dir, f"{sitename}_merged.pt"))
         model.load_state_dict(checkpoint)

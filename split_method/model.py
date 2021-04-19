@@ -42,17 +42,20 @@ class DNN(nn.Module):
         return x
 
 class DNN_merged(nn.Module):
-    def __init__(self, ext_model, nor_model, output_dim):
+    def __init__(self, ext_model, nor_model, input_dim, output_dim, source_size):
         super().__init__()
         self.ext_model = ext_model
         self.nor_model = nor_model
-        self.dense_out = nn.Linear(output_dim * 2, output_dim)
+        self.dense_emb = nn.Linear(input_dim, output_dim)
+        self.dense_out = nn.Linear(source_size+2, output_dim)
         self.relu = nn.ReLU(True)
 
     def forward(self, x):
         source_size = x.shape[1]
+        emb = self.dense_emb(x).squeeze(-1)
         ext = self.ext_model(x)
         nor = self.nor_model(x)
-        total = torch.cat((ext, nor), dim=-1)
+        total = torch.cat((emb, ext , nor ), dim=-1)
+        #out = emb + ext * 0.95 + nor * 0.05
         out = self.dense_out(total)
         return out

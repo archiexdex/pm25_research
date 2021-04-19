@@ -54,7 +54,7 @@ def add_arguments(parser):
     parser.add_argument('--threshold_path',         type=str,   default="../data/train_threshold.json",   help='')
     parser.add_argument('--cpt_dir',                type=str,   default="checkpoints",                 help='')
     parser.add_argument('--log_dir',                type=str,   default="logs",                        help='')
-    parser.add_argument('--test_results_dir',       type=str,   default="test_results",                help='')
+    parser.add_argument('--results_dir',       type=str,   default="results",                help='')
     parser.add_argument('--visual_results_dir',     type=str,   default="visual_results",              help='')
     parser.add_argument('--config_dir',             type=str,   default="configs",                     help='')
     

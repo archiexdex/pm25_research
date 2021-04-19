@@ -58,7 +58,9 @@ for sitename in sitenames:
         model = DNN_merged(
             ext_model=ext_model, 
             nor_model=nor_model,
+            input_dim=opt.input_dim,
             output_dim=opt.output_dim,
+            source_size=opt.source_size
         ).to(device)
     else:
         model = get_model(opt.model, opt).to(device)
@@ -66,19 +68,20 @@ for sitename in sitenames:
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     mse = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()
-    criterion = EXTLoss() 
+    ext_loss = EXTLoss()
+    criterion = ext_loss if opt.method == "extreme" else mse
 
     total_epoch = opt.total_epoch
     patience = opt.patience
-    best_rmse = 1e9
+    best_loss = 1e9
     earlystop_counter = 0
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
         train_loss = train(model, train_dataloader, criterion, optimizer)
         valid_loss = test(model, valid_dataloader, criterion)
-        if best_rmse > valid_loss:
-            best_rmse = valid_loss
+        if best_loss > valid_loss["loss"]:
+            best_loss = valid_loss["loss"]
             torch.save(model.state_dict(), f"checkpoint.pt")
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")
@@ -88,11 +91,11 @@ for sitename in sitenames:
             earlystop_counter += 1
             if earlystop_counter >= patience:
                 print("Early stop!!!")
-                print(f"sitename: {sitename}\nepoch: {epoch}\nbest_rmse: {best_rmse: .4f}")
+                print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {valid_loss['rmse']: .4f}")
                 os.rename("checkpoint.pt", os.path.join(cpt_dir, f"{sitename}_{opt.method}.pt"))
                 train_records[sitename] = {
                     "mode": opt.method,
-                    "best_rmse": f"{best_rmse:.3f}", 
+                    "best_rmse": f"{valid_loss['rmse']:.3f}", 
                     "epoch": epoch, 
                     "timestamp": datetime.now() - st_time
                 }

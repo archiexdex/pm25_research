@@ -44,8 +44,8 @@ def train(model, dataloader, criterion, optimizer):
         mean_pred_loss += pred_loss.item()
         mean_rmse_loss += (torch.sqrt(mse_loss)).item()
         trange.set_description(\
-            f"Training mean loss rmse: {mean_rmse_loss / (idx+1):.3f}, pred: {mean_pred_loss / (idx+1):.3e}")
-    train_loss = mean_rmse_loss / len(dataloader)
+            f"Training mean loss rmse: {mean_rmse_loss / (idx+1):.3f}, pred: {mean_pred_loss / (idx+1):.4e}")
+    train_loss = mean_pred_loss / len(dataloader)
     return train_loss
 
 def test(model, dataloader, criterion):
@@ -65,12 +65,17 @@ def test(model, dataloader, criterion):
         # get loss & update
         y_pred = model(x)
         # Calculate loss
+        pred_loss = criterion(y_pred, y_true)
         mse_loss  = mse(y_pred * thres_y, y_true * thres_y)
         # Record loss
+        mean_pred_loss += pred_loss.item()
         mean_rmse_loss += (torch.sqrt(mse_loss)).item()
-        trange.set_description(f"Validation mean rmse: {mean_rmse_loss / (idx+1):.3f}")
-    valid_loss = mean_rmse_loss / len(dataloader)
-    return valid_loss
+        trange.set_description(f"Validation mean rmse: {mean_rmse_loss / (idx+1):.3f}, pred: {mean_pred_loss / (idx+1):.4e}")
+    valid_loss = mean_pred_loss / len(dataloader)
+    return {
+        "loss" : valid_loss,
+        "rmse": mean_rmse_loss / len(dataloader)
+    }
 
 def write_record(path, records):
     header = ["sitename", "mode", "best_rmse", "epoch", "cost_time"]
