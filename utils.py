@@ -6,7 +6,6 @@ from argparse import Namespace
 import json
 import torch
 from sklearn.metrics import f1_score, precision_score
-from model import *
 torch.autograd.set_detect_anomaly(True)
 
 def same_seeds(seed):

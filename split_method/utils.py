@@ -72,9 +72,10 @@ def test(model, dataloader, criterion):
         mean_rmse_loss += (torch.sqrt(mse_loss)).item()
         trange.set_description(f"Validation mean rmse: {mean_rmse_loss / (idx+1):.3f}, pred: {mean_pred_loss / (idx+1):.4e}")
     valid_loss = mean_pred_loss / len(dataloader)
+    mean_rmse_loss = mean_rmse_loss / len(dataloader)
     return {
         "loss" : valid_loss,
-        "rmse": mean_rmse_loss / len(dataloader)
+        "rmse": mean_rmse_loss
     }
 
 def write_record(path, records):
@@ -164,68 +165,4 @@ def get_model(name, opt):
             num_layers    = opt.num_layers,
             bidirectional = opt.bidirectional
         )
-    #if name == "fudan":
-    #    model = Fudan(
-    #                input_dim=opt.input_dim,
-    #                emb_dim=opt.emb_dim,
-    #                output_dim=opt.output_dim,
-    #                hid_dim=opt.hid_dim,
-    #                device=device,
-    #                dropout=opt.dropout,
-    #                bidirectional=opt.bidirectional,
-    #            )
-    #elif name == "seq2seq":
-    #    model = Seq2Seq(
-    #                input_dim=opt.input_dim,
-    #                emb_dim=opt.emb_dim,
-    #                output_dim=opt.output_dim,
-    #                hid_dim=opt.hid_dim,
-    #                device=device,
-    #                dropout=opt.dropout,
-    #                bidirectional=opt.bidirectional,
-    #            )
-    #elif name == "cnn":
-    #    model = CNNModel(
-    #                input_dim=opt.input_dim,
-    #                emb_dim=opt.emb_dim,
-    #                output_dim=opt.output_dim,
-    #                seq_len=opt.memory_size+opt.source_size,
-    #                trg_len=1,
-    #                device=device,
-    #                dropout=opt.dropout,
-    #            )
-    #elif name == 'unet':
-    #    model = UNET(
-    #                input_dim=opt.input_dim,
-    #                emb_dim=opt.emb_dim,
-    #                output_dim=opt.output_dim,
-    #                seq_len=opt.memory_size+opt.source_size,
-    #                trg_len=1,
-    #                device=device,
-    #                dropout=opt.dropout,
-    #            )
-    #elif name == 'gru':
-    #    model = SimpleGRU(
-    #                input_dim=opt.input_dim,
-    #                emb_dim=opt.emb_dim,
-    #                output_dim=opt.output_dim,
-    #                hid_dim=opt.hid_dim,
-    #                target_length=opt.target_size,
-    #            )
-    #elif name == 'lstm':
-    #    model = SimpleLSTM(
-    #                input_dim=opt.input_dim,
-    #                emb_dim=opt.emb_dim,
-    #                output_dim=opt.output_dim,
-    #                hid_dim=opt.hid_dim,
-    #                target_length=opt.target_size,
-    #            )
-    #elif name == 'dnn':
-    #    model = SimpleDNN(
-    #                input_dim=opt.input_dim,
-    #                emb_dim=opt.emb_dim,
-    #                output_dim=opt.output_dim,
-    #                hid_dim=opt.hid_dim,
-    #                target_length=opt.target_size,
-    #            )
     return model

@@ -12,6 +12,7 @@ np files what aimed to access data quickly.
 
 # MARK: - Variables
 opt = parse()
+print(opt)
 
 # pollutant features = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5']
 # weather features = ['RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',]
@@ -93,27 +94,29 @@ def get_normalize(data):
     ratio = opt.ratio
     for i, key in enumerate(data):
         _data = data[key].copy()
-        thres_list = np.zeros((_data.shape[0], 1))
+        thres_list = np.zeros((_data.shape[0], _data.shape[-1]))
         # summer
         s_index = np.isin(_data[:, -3], summer_months)
-        s_mean  = _data[s_index, 7].mean()
-        s_std   = _data[s_index, 7].std()
+        s_mean  = _data[s_index].mean()
+        s_std   = _data[s_index].std()
         s_threshold = s_mean + s_std * ratio
         thres_list[s_index] = s_threshold
         # winter
         w_index = np.isin(_data[:, -3], summer_months, invert=True)
-        w_mean  = _data[w_index, 7].mean()
-        w_std   = _data[w_index, 7].std()
+        w_mean  = _data[w_index].mean()
+        w_std   = _data[w_index].std()
         w_threshold = w_mean + w_std * ratio
         thres_list[w_index] = w_threshold
         # global
         mean = _data.mean(axis=0)
         std  = _data.std(axis=0)
         # normalize
-        _data[:, :7] = (_data[:, :7] - mean[:7]) / std[:7]
-        _data[:, 8:] = (_data[:, 8:] - mean[8:]) / std[8:]
-        _data[s_index, 7] /= s_threshold
-        _data[w_index, 7] /= w_threshold
+        # (x - mu) / std
+        #_data[:, :7] = (_data[:, :7] - mean[:7]) / std[:7]
+        #_data[:, 8:] = (_data[:, 8:] - mean[8:]) / std[8:]
+        # (x - min) / range
+        _data[s_index] /= s_threshold
+        _data[w_index] /= w_threshold
         data[key] = _data
         # save 
         mean_dict[key] = mean.tolist()
@@ -126,7 +129,7 @@ def put_normalize(data, mean_dict, std_dict, threshold_dict):
     thres_dict = {}
     for i, key in enumerate(data):
         _data = data[key].copy()
-        thres_list = np.zeros((_data.shape[0], 1))
+        thres_list = np.zeros((_data.shape[0], _data.shape[1]))
         mean = np.array(mean_dict[key])
         std = np.array(std_dict[key])
         # summer
@@ -138,10 +141,10 @@ def put_normalize(data, mean_dict, std_dict, threshold_dict):
         w_threshold = threshold_dict[key]["winter"]
         thres_list[w_index] = w_threshold
         # normalize
-        _data[:, :7] = (_data[:, :7] - mean[:7]) / std[:7]
-        _data[:, 8:] = (_data[:, 8:] - mean[8:]) / std[8:]
-        _data[s_index, 7] /= s_threshold
-        _data[w_index, 7] /= w_threshold
+        #_data[:, :7] = (_data[:, :7] - mean[:7]) / std[:7]
+        #_data[:, 8:] = (_data[:, 8:] - mean[8:]) / std[8:]
+        _data[s_index] /= s_threshold
+        _data[w_index] /= w_threshold
         data[key] = _data
         thres_dict[key] = thres_list
     return data, thres_dict

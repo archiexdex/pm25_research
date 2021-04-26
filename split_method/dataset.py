@@ -33,7 +33,7 @@ class PMExtDataset(Dataset):
         thres_list = []
         x_len = self.source_size
         y_len = self.target_size
-        for i in range(0, data.shape[0]-(x_len+y_len)):
+        for i in range(data.shape[0]-(x_len+y_len)):
             st = i
             ed = i + x_len + y_len
             window = data[st:ed]
@@ -61,7 +61,7 @@ class PMExtDataset(Dataset):
         y = window[self.source_size:, 7:8]
         y_ext = y >= 1
         thres_window = self.thres_data[idx]
-        thres_y = thres_window[self.source_size:]
+        thres_y = thres_window[self.source_size:, 7:8]
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\
@@ -109,7 +109,7 @@ class PMDataset(Dataset):
         ed = idx + self.source_size + self.target_size
         y = self.data[st:ed, 7:8]
         y_ext = y >= 1
-        thres_y = self.thres_data[st:ed]
+        thres_y = self.thres_data[st:ed, 7:8]
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\

@@ -31,7 +31,7 @@ device = get_device()
 name_list = []
 data_list = {"rmse": [], "f1": [], "micro": [], "macro": [], "weighted": []}
 for sitename in sitenames:
-    if opt.skip_site == 1 and sitename not in sample_sites:
+    if opt.skip_site and sitename not in sample_sites:
         continue
     print(sitename)
     test_dataset    = PMDataset(sitename=sitename, config=opt, isTrain=False)

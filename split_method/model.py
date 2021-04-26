@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from custom_loss import *
 
 class GRU(nn.Module):
     def __init__(self, input_dim, emb_dim, hid_dim, output_dim, source_size, dropout, num_layers, bidirectional):
@@ -31,12 +32,16 @@ class DNN(nn.Module):
         self.dense_out = nn.Linear(hid_dim*source_size, output_dim)
         self.dropout = nn.Dropout()
         self.relu = nn.ReLU(True)
+        self.activation = EXTActvation()
+        self.softmax = nn.Softmax(dim=-1)
         self.leakyrelu = nn.LeakyReLU(True)
     
     def forward(self, x):
         source_size = x.shape[1]
-        x = self.leakyrelu(self.dense_emb(x))
-        x = self.leakyrelu(self.dense_hid(self.dropout(x)))
+        # x = self.leakyrelu(self.dense_emb(x))
+        # x = self.leakyrelu(self.dense_hid(self.dropout(x)))
+        x = self.softmax(self.dense_emb(x))
+        x = self.softmax(self.dense_hid(x))
         x = x.view(-1, x.shape[1] * x.shape[2])
         x = self.relu(self.dense_out(self.dropout(x)))
         return x
