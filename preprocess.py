@@ -97,14 +97,14 @@ def get_normalize(data):
         thres_list = np.zeros((_data.shape[0], _data.shape[-1]))
         # summer
         s_index = np.isin(_data[:, -3], summer_months)
-        s_mean  = _data[s_index].mean()
-        s_std   = _data[s_index].std()
+        s_mean  = _data[s_index].mean(0)
+        s_std   = _data[s_index].std(0)
         s_threshold = s_mean + s_std * ratio
         thres_list[s_index] = s_threshold
         # winter
         w_index = np.isin(_data[:, -3], summer_months, invert=True)
-        w_mean  = _data[w_index].mean()
-        w_std   = _data[w_index].std()
+        w_mean  = _data[w_index].mean(0)
+        w_std   = _data[w_index].std(0)
         w_threshold = w_mean + w_std * ratio
         thres_list[w_index] = w_threshold
         # global
@@ -194,6 +194,9 @@ if __name__ == '__main__':
     with open("data/train_std.json", "w") as fp:
         json.dump(train_std,  fp, ensure_ascii=False, indent=4)
     with open("data/train_threshold.json", "w") as fp:
+        for key in train_threshold:
+            train_threshold[key]["winter"] = train_threshold[key]["winter"].tolist()
+            train_threshold[key]["summer"] = train_threshold[key]["summer"].tolist()
         json.dump(train_threshold,  fp, ensure_ascii=False, indent=4)
     
     # check whether the folder exists
