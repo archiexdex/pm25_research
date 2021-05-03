@@ -17,7 +17,7 @@ def add_arguments(parser):
     parser.add_argument('--batch_size',   type=int,   default=1024, help='batch size')
     parser.add_argument('--lr',           type=float, default=5e-4, help='')
     parser.add_argument('--total_epoch',  type=int,   default=1000, help='')
-    parser.add_argument('--patience',     type=int,   default=5,    help='')
+    parser.add_argument('--patience',     type=int,   default=10,    help='')
     parser.add_argument('--skip_site',    action='store_true',      help='')
     parser.add_argument('--ratio',        type=int,   default=2,    help='')
 

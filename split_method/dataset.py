@@ -115,3 +115,56 @@ class PMDataset(Dataset):
                 torch.FloatTensor(y),\
                 torch.FloatTensor(y_ext),\
                 torch.FloatTensor(thres_y)
+
+class PMDiscreteDataset(Dataset):
+    def __init__(self, config, sitename, isTrain=False):
+
+        def _read_file(mode):
+            if mode == 0:
+                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+            elif mode == 1:
+                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+            if os.path.exists(read_path):
+                data = np.load(read_path)
+            else:
+                raise ValueError(f"path {filename} doesn't exist")
+            return data
+
+        self.data       = _read_file(mode=0)
+        self.thres_data = _read_file(mode=1)
+
+        self.model        = config.model
+        self.memory_size  = config.memory_size
+        self.window_size  = config.window_size
+        self.source_size  = config.source_size
+        self.target_size  = config.target_size
+        self.threshold    = config.threshold
+        self.shuffle      = config.shuffle
+        self.is_transform = config.is_transform
+        self.size       = self.data.shape[0] - self.source_size - self.target_size
+        
+        # Discrete ground truth on label
+        self.true = self.data.copy()
+        self.true = self.true // 10 * 10
+        self.thres_data = self.thres_data // 10 * 10
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        """
+        """
+        st = idx
+        ed = idx + self.source_size
+        x = self.data[st:ed]
+
+        st = idx + self.source_size
+        ed = idx + self.source_size + self.target_size
+        y = self.true[st:ed, 7:8]
+        y_ext = y >= 1
+        thres_y = self.thres_data[st:ed, 7:8]
+
+        return  torch.FloatTensor(x),\
+                torch.FloatTensor(y),\
+                torch.FloatTensor(y_ext),\
+                t

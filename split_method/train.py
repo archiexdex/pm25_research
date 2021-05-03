@@ -69,8 +69,9 @@ for sitename in sitenames:
     mse = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()
     ext_loss = EXTLoss()
-    criterion = ext_loss if opt.method == "extreme" else mse
-    # criterion = ext_loss
+    # criterion = ext_loss if opt.method == "extreme" else mse
+    # criterion = mse
+    criterion = ext_loss
 
     total_epoch = opt.total_epoch
     patience = opt.patience
@@ -95,10 +96,10 @@ for sitename in sitenames:
             if earlystop_counter >= patience:
                 print("Early stop!!!")
                 break
-    print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {valid_loss['rmse']: .4f}")
+    print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_rmse: .4f}")
     train_records[sitename] = {
         "mode": opt.method,
-        "best_rmse": f"{valid_loss['rmse']:.3f}", 
+        "best_rmse": f"{best_rmse:.3f}", 
         "epoch": epoch, 
         "timestamp": datetime.now() - st_time
     }
