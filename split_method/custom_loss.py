@@ -23,3 +23,15 @@ class EXTActvation(nn.Module):
         # ret = torch.exp(-torch.exp(-x))
         ret = torch.exp(torch.pow(x, self.alpha))
         return ret
+
+class FudanLoss(nn.Module):
+    def __init__(self, gamma=1):
+        super().__init__()
+        self.gamma = gamma
+    
+    def forward(self, x, y):
+        x = nn.Sigmoid()(x)
+        normal  = -1 * 0.5 * torch.pow(1-x/self.gamma, self.gamma)     * y * torch.log(x)
+        extreme = -1 * 0.5 * torch.pow(1-(1-x)/self.gamma, self.gamma) * (1-y) * torch.log(1-x)
+        ret = torch.mean(normal + extreme)
+        return ret

@@ -7,7 +7,7 @@ from torch import nn
 from torch import optim
 from torch.utils.data import DataLoader
 from datetime import datetime
-from dataset import PMExtDataset, PMDataset
+from dataset import *
 import csv
 
 # Train
@@ -70,8 +70,8 @@ for sitename in sitenames:
     bce = nn.BCEWithLogitsLoss()
     ext_loss = EXTLoss()
     # criterion = ext_loss if opt.method == "extreme" else mse
-    # criterion = mse
-    criterion = ext_loss
+    criterion = mse
+    # criterion = ext_loss
 
     total_epoch = opt.total_epoch
     patience = opt.patience

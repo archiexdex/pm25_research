@@ -76,6 +76,7 @@ def test(model, dataloader, criterion):
         "rmse": mean_rmse_loss
     }
 
+
 def train_gan(G, D, dataloader, optim_g, optim_d):
     G.train()
     D.train()

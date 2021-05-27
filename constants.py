@@ -32,7 +32,7 @@ feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'month', 'day', 'hour' 
                 ]
 
-summer_months = [4,5,6,7,8,9] # 1 is Junary
+summer_months = [5,6,7,8,9] # 1 is Junary
 
 field = [
     "sitename", 
