@@ -1,5 +1,4 @@
 from utils import *
-from custom_loss import *
 from constants import *
 from tqdm import tqdm
 import torch
@@ -8,12 +7,11 @@ from torch import optim
 from torch.utils.data import DataLoader
 from datetime import datetime
 from dataset import *
+from model import *
 import csv
 
-# Train
 opt = parse()
 same_seeds(opt.seed)
-save_config(opt, opt.config_dir, str(opt.no), opt.method)
 
 if opt.no is not None:
     no = opt.no
@@ -21,9 +19,26 @@ else:
     print("n is not a number")
     exit()
 
-cpt_dir = get_path(opt.cpt_dir, mode=0)
-cpt_dir = get_path(cpt_dir, no, mode=0)
-log_dir = get_path(opt.log_dir, mode=0)
+try:
+    cfg_dir = os.makedirs(os.path.join(opt.cfg_dir), 0o777)
+except:
+    pass
+cpt_dir = os.path.join(opt.cpt_dir, str(no))
+log_dir = os.path.join(opt.log_dir, str(no))
+if (not opt.yes) and os.path.exists(cpt_dir):
+    res = input(f"no: {no} exists, are you sure continue training? It will override all files.[y:N]")
+    res = res.lower()
+    if res not in ["y", "yes"]:
+        print("Stop training")
+        exit()
+    print("Override all files.")
+if os.path.exists(cpt_dir):
+    shutil.rmtree(cpt_dir)
+if os.path.exists(log_dir):
+    shutil.rmtree(log_dir)
+os.makedirs(cpt_dir, 0o777)
+os.makedirs(log_dir, 0o777)
+save_config(opt)
 
 device = get_device()
 
@@ -34,44 +49,30 @@ for sitename in sitenames:
     print(sitename)
     
     # Dataset
-    if opt.method in ["all", "merged"]:
-        train_dataset = PMDataset(sitename=sitename, config=opt, isTrain=True)
-        valid_dataset = PMDataset(sitename=sitename, config=opt, isTrain=False)
-    elif opt.method == "extreme":
-        train_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=True, isTrain=True)
-        valid_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=True, isTrain=False)
-    elif opt.method == "normal":
-        train_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=False, isTrain=True)
-        valid_dataset = PMExtDataset(sitename=sitename, config=opt, use_ext=False, isTrain=False)
+    train_dataset = PMDataset(sitename=sitename, config=opt, isTrain=True)
+    valid_dataset = PMDataset(sitename=sitename, config=opt, isTrain=False)
 
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
     if opt.method == "merged":
-        ext_model = load_model(os.path.join(cpt_dir, f"{sitename}_extreme.pt"), opt.model, opt).to(device)
-        nor_model = load_model(os.path.join(cpt_dir, f"{sitename}_normal.pt"),  opt.model, opt).to(device)
+        nor_model = load_model(os.path.join(f"checkpoints/88/{sitename}_normal.pt"),  opt).to(device)
+        ext_model = load_model(os.path.join(f"checkpoints/89/{sitename}_extreme.pt"), opt).to(device)
         # MARK: - learnable model or fronzen?
-        ext_model.eval()
         nor_model.eval()
+        ext_model.eval()
         
         model = DNN_merged(
-            ext_model=ext_model, 
+            opt=opt,
             nor_model=nor_model,
-            input_dim=opt.input_dim,
-            output_dim=opt.output_dim,
-            source_size=opt.source_size
+            ext_model=ext_model, 
         ).to(device)
     else:
-        model = get_model(opt.model, opt).to(device)
+        model = get_model(opt).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
-    mse = nn.MSELoss()
-    bce = nn.BCEWithLogitsLoss()
-    ext_loss = EXTLoss()
-    # criterion = ext_loss if opt.method == "extreme" else mse
-    criterion = mse
-    # criterion = ext_loss
+    device = get_device()
 
     total_epoch = opt.total_epoch
     patience = opt.patience
@@ -81,11 +82,11 @@ for sitename in sitenames:
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = train(model, train_dataloader, criterion, optimizer)
-        valid_loss = test(model, valid_dataloader, criterion)
+        train_loss = train(opt, model, train_dataloader, optimizer, device)
+        valid_loss = test (opt, model, valid_dataloader, device)
         if best_loss > valid_loss["loss"] or best_rmse > valid_loss["rmse"]:
-            best_loss = min(best_loss, valid_loss["loss"])
-            best_rmse = min(best_rmse, valid_loss["rmse"])
+            best_loss = valid_loss["loss"]
+            best_rmse = valid_loss["rmse"]
             torch.save(model.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}.pt"))
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")

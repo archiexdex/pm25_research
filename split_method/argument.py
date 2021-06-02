@@ -1,9 +1,6 @@
 
 def add_arguments(parser):
     '''
-    Add your arguments here if needed. The TAs will run test.py to load
-    your default arguments.
-
     For example:
         parser.add_argument('--batch_size', type=int, default=32, help='batch size for training')
         parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate for training')
@@ -18,8 +15,9 @@ def add_arguments(parser):
     parser.add_argument('--lr',           type=float, default=5e-4, help='')
     parser.add_argument('--total_epoch',  type=int,   default=1000, help='')
     parser.add_argument('--patience',     type=int,   default=10,    help='')
-    parser.add_argument('--skip_site',    action='store_true',      help='')
+    parser.add_argument('--skip_site',    action='store_true', default=True,     help='')
     parser.add_argument('--ratio',        type=int,   default=2,    help='')
+    parser.add_argument('-y', '--yes',    action='store_true',      help='')
 
     parser.add_argument('--memory_size',     type=int,   default=6570, help='The size of histry data 8760 for one year, 6570 for 9 months, 4380 for 6 months, 2160 for 3 months, 730 for 1 month')
     parser.add_argument('--window_size',     type=int,   default=8,    help='The size of history data period, it only use in fudan model.')
@@ -54,9 +52,9 @@ def add_arguments(parser):
     parser.add_argument('--threshold_path',         type=str,   default="../data/train_threshold.json", help='')
     parser.add_argument('--cpt_dir',                type=str,   default="checkpoints",                  help='')
     parser.add_argument('--log_dir',                type=str,   default="logs",                         help='')
-    parser.add_argument('--results_dir',            type=str,   default="results",                      help='')
+    parser.add_argument('--rst_dir',                type=str,   default="results",                      help='')
+    parser.add_argument('--cfg_dir',                type=str,   default="configs",                      help='')
     parser.add_argument('--visual_results_dir',     type=str,   default="visual_results",               help='')
-    parser.add_argument('--config_dir',             type=str,   default="configs",                      help='')
     
     
     

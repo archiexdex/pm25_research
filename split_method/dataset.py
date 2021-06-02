@@ -259,15 +259,16 @@ class PMUnetDataset(Dataset):
         ed = idx + self.source_size
         x = self.data[st:ed]
 
-        st = st + 1
-        ed = ed + 1
+        st = st
+        ed = ed
         y = self.data[st:ed, 7:8].copy()
         y_ext = y >= 1
         thres_y = self.thres_data[st:ed, 7:8]
         # random mask data
         if self.isTrain:
-            ptr = random.randint(0, x.shape[0]-1)
-            x[ptr] = 0
+            sz = 8
+            st = random.randint(0, x.shape[0]-sz)
+            x[st:st+sz, :-3] = 0
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\
