@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from torch import nn
 
+EPS = 1e-8
+
 class EXTLoss(nn.Module):
     def __init__(self):
         super().__init__()
@@ -31,7 +33,7 @@ class FudanLoss(nn.Module):
     
     def forward(self, x, y):
         x = nn.Sigmoid()(x)
-        normal  = -1 * 0.5 * torch.pow(1-x/self.gamma, self.gamma)     * y * torch.log(x)
-        extreme = -1 * 0.5 * torch.pow(1-(1-x)/self.gamma, self.gamma) * (1-y) * torch.log(1-x)
+        normal  = -1 * 0.95 * torch.pow(1-x/self.gamma, self.gamma)     * y * torch.log(x + EPS)
+        extreme = -1 * 0.05 * torch.pow(1-(1-x)/self.gamma, self.gamma) * (1-y) * torch.log(1-x + EPS)
         ret = torch.mean(normal + extreme)
         return ret

@@ -94,7 +94,7 @@ class PMDataset(Dataset):
         self.threshold    = config.threshold
         self.shuffle      = config.shuffle
         self.is_transform = config.is_transform
-        self.size       = self.data.shape[0] - self.source_size - self.target_size
+        self.size       = self.data.shape[0] - self.source_size - self.target_size + 1
 
     def __len__(self):
         return self.size
@@ -142,7 +142,7 @@ class PMDiscreteDataset(Dataset):
         self.threshold    = config.threshold
         self.shuffle      = config.shuffle
         self.is_transform = config.is_transform
-        self.size         = self.data.shape[0] - self.source_size - self.target_size
+        self.size         = self.data.shape[0] - self.source_size - self.target_size + 1
         self.mode         = mode
         
         # Discrete ground truth on label
@@ -246,7 +246,7 @@ class PMUnetDataset(Dataset):
         self.threshold    = config.threshold
         self.shuffle      = config.shuffle
         self.is_transform = config.is_transform
-        self.size         = self.data.shape[0] - self.source_size
+        self.size         = self.data.shape[0] - self.source_size + 1
         self.isTrain      = isTrain
 
     def __len__(self):
@@ -259,8 +259,6 @@ class PMUnetDataset(Dataset):
         ed = idx + self.source_size
         x = self.data[st:ed]
 
-        st = st
-        ed = ed
         y = self.data[st:ed, 7:8].copy()
         y_ext = y >= 1
         thres_y = self.thres_data[st:ed, 7:8]
@@ -274,3 +272,84 @@ class PMUnetDataset(Dataset):
                 torch.FloatTensor(y),\
                 torch.FloatTensor(y_ext),\
                 torch.FloatTensor(thres_y)
+
+class PMFudanDataset(Dataset):
+    def __init__(self, config, sitename, isTrain=False):
+        
+        def _read_file(mode):
+            if mode == 0:
+                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+            elif mode == 1:
+                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+            if os.path.exists(read_path):
+                data = np.load(read_path)
+            else:
+                raise ValueError(f"path {filename} doesn't exist")
+            return data
+
+        self.data       = _read_file(mode=0)[:, 7:8]
+        self.thres_data = _read_file(mode=1)[:, 7:8]
+
+        self.model        = config.model
+        self.batch_size   = config.batch_size
+        self.memory_size  = config.memory_size
+        self.window_size  = config.window_size
+        self.source_size  = config.source_size
+        self.target_size  = config.target_size
+        self.threshold    = config.threshold
+        self.shuffle      = config.shuffle
+        self.is_transform = config.is_transform
+        self.isTrain      = isTrain
+
+        self.size = self.data.shape[0] - self.memory_size - self.window_size - self.source_size - self.target_size + 1
+        # Create past window input & past extreme event label
+        self.all_window = np.zeros([self.size+self.memory_size, self.window_size, self.data.shape[-1]])
+        self.all_ext    = np.zeros([self.size+self.memory_size, 1])
+        for j in range(self.all_window.shape[0]):
+            # input
+            st = j
+            ed = j + self.window_size
+            self.all_window[j] = self.data[st: ed]
+            # label
+            st = j + self.window_size + self.target_size - 1
+            ed = j + self.window_size + self.target_size
+            self.all_ext[j] = self.data[st: ed] >= 1
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        """
+            past_windows: [batch, target_size, window_len, 16]
+            past_ext:     [batch, target_size, window_len, 1]
+            x:            [batch, target_size, 16]
+            y:            [batch, target_size, 1]
+            y_ext:        [batch, target_size, 1]
+        """
+        # Past window, each window has a sequence of data
+        past_windows = np.zeros((self.source_size, self.memory_size, self.window_size, 1))
+        past_exts    = np.zeros((self.source_size, self.memory_size, 1)) 
+        indexs = np.arange(idx + self.memory_size)
+        for k in range(past_windows.shape[0]):
+            np.random.shuffle(indexs)
+            sample = indexs[:self.memory_size]
+            past_windows[k] = self.all_window[sample]
+            past_exts[k]    = self.all_ext[sample]
+        
+        # Input
+        st = idx + self.memory_size + self.window_size  
+        ed = idx + self.memory_size + self.window_size + self.source_size
+        x = self.data[st: ed]
+        # Target, only predict pm2.5, so select '7:8'
+        st = idx + self.memory_size + self.window_size + self.target_size
+        ed = idx + self.memory_size + self.window_size + self.target_size + self.source_size 
+        y = self.data[st:ed]
+        y_ext = y >= 1
+        thres_y = self.thres_data[st:ed]
+
+        return  torch.FloatTensor(x),\
+                torch.FloatTensor(y),\
+                torch.FloatTensor(y_ext),\
+                torch.FloatTensor(thres_y),\
+                torch.FloatTensor(past_windows),\
+                torch.FloatTensor(past_exts)
