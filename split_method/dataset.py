@@ -287,8 +287,8 @@ class PMFudanDataset(Dataset):
                 raise ValueError(f"path {filename} doesn't exist")
             return data
 
-        self.data       = _read_file(mode=0)[:, 7:8]
-        self.thres_data = _read_file(mode=1)[:, 7:8]
+        self.data       = _read_file(mode=0) #[:, 7:8]
+        self.thres_data = _read_file(mode=1) #[:, 7:8]
 
         self.model        = config.model
         self.batch_size   = config.batch_size
@@ -296,6 +296,7 @@ class PMFudanDataset(Dataset):
         self.window_size  = config.window_size
         self.source_size  = config.source_size
         self.target_size  = config.target_size
+        self.input_dim    = config.input_dim
         self.threshold    = config.threshold
         self.shuffle      = config.shuffle
         self.is_transform = config.is_transform
@@ -313,7 +314,7 @@ class PMFudanDataset(Dataset):
             # label
             st = j + self.window_size + self.target_size - 1
             ed = j + self.window_size + self.target_size
-            self.all_ext[j] = self.data[st: ed] >= 1
+            self.all_ext[j] = self.data[st: ed, 7:8] >= 1
 
     def __len__(self):
         return self.size
@@ -327,7 +328,7 @@ class PMFudanDataset(Dataset):
             y_ext:        [batch, target_size, 1]
         """
         # Past window, each window has a sequence of data
-        past_windows = np.zeros((self.source_size, self.memory_size, self.window_size, 1))
+        past_windows = np.zeros((self.source_size, self.memory_size, self.window_size, self.input_dim))
         past_exts    = np.zeros((self.source_size, self.memory_size, 1)) 
         indexs = np.arange(idx + self.memory_size)
         for k in range(past_windows.shape[0]):
@@ -343,9 +344,9 @@ class PMFudanDataset(Dataset):
         # Target, only predict pm2.5, so select '7:8'
         st = idx + self.memory_size + self.window_size + self.target_size
         ed = idx + self.memory_size + self.window_size + self.target_size + self.source_size 
-        y = self.data[st:ed]
+        y = self.data[st:ed, 7:8]
         y_ext = y >= 1
-        thres_y = self.thres_data[st:ed]
+        thres_y = self.thres_data[st:ed, 7:8]
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\

@@ -8,7 +8,7 @@ class GRU(nn.Module):
         super().__init__()
         # Parse paras
         input_dim     = opt.input_dim
-        emb_dim       = opt.emb_dim 
+        embed_dim     = opt.embed_dim 
         hid_dim       = opt.hid_dim 
         output_dim    = opt.output_dim
         source_size   = opt.source_size
@@ -17,9 +17,9 @@ class GRU(nn.Module):
         bidirectional = opt.bidirectional
         self.target_size = opt.target_size
         # 
-        self.dense_emb = nn.Linear(input_dim, emb_dim)
+        self.dense_emb = nn.Linear(input_dim, embed_dim)
         self.dense_out = nn.Linear(hid_dim*source_size*num_layers, output_dim*self.target_size)
-        self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
+        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.leakyrelu = nn.LeakyReLU()
@@ -40,14 +40,14 @@ class DNN(nn.Module):
         super().__init__()
         # Parse paras
         input_dim=opt.input_dim
-        emb_dim=opt.emb_dim 
+        embed_dim=opt.embed_dim 
         hid_dim=opt.hid_dim
         output_dim=opt.output_dim
         source_size=opt.source_size
         self.target_size=opt.target_size
         # 
-        self.dense_emb  = nn.Linear(input_dim, emb_dim)
-        self.dense_hid  = nn.Linear(emb_dim, hid_dim)
+        self.dense_emb  = nn.Linear(input_dim, embed_dim)
+        self.dense_hid  = nn.Linear(embed_dim, hid_dim)
         self.dense_out  = nn.Linear(hid_dim*source_size, output_dim*self.target_size)
         self.dropout    = nn.Dropout()
         self.relu       = nn.ReLU()
@@ -97,10 +97,10 @@ class DNN_merged(nn.Module):
         return out
 
 class G_DNN(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, source_size):
+    def __init__(self, input_dim, embed_dim, hid_dim, output_dim, source_size):
         super().__init__()
-        self.dense_emb = nn.Linear(input_dim, emb_dim)
-        self.dense_hid = nn.Linear(emb_dim, hid_dim)
+        self.dense_emb = nn.Linear(input_dim, embed_dim)
+        self.dense_hid = nn.Linear(embed_dim, hid_dim)
         self.dense_out = nn.Linear(hid_dim, output_dim)
         self.dropout = nn.Dropout()
         self.relu = nn.ReLU()
@@ -115,11 +115,11 @@ class G_DNN(nn.Module):
         return x
 
 class G_GRU(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, source_size, dropout, num_layers, bidirectional):
+    def __init__(self, input_dim, embed_dim, hid_dim, output_dim, source_size, dropout, num_layers, bidirectional):
         super().__init__()
-        self.dense_emb = nn.Linear(input_dim, emb_dim)
+        self.dense_emb = nn.Linear(input_dim, embed_dim)
         self.dense_out = nn.Linear(hid_dim*num_layers, output_dim)
-        self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
+        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.leakyrelu = nn.LeakyReLU()
@@ -133,10 +133,10 @@ class G_GRU(nn.Module):
         return x
 
 class D_DNN(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, source_size):
+    def __init__(self, input_dim, embed_dim, hid_dim, output_dim, source_size):
         super().__init__()
-        self.dense_emb = nn.Linear(input_dim, emb_dim)
-        self.dense_hid = nn.Linear(emb_dim, hid_dim)
+        self.dense_emb = nn.Linear(input_dim, embed_dim)
+        self.dense_hid = nn.Linear(embed_dim, hid_dim)
         self.dense_out = nn.Linear(hid_dim*source_size, output_dim)
         self.dropout = nn.Dropout()
         self.relu = nn.ReLU()
@@ -151,11 +151,11 @@ class D_DNN(nn.Module):
         return x
 
 class D_GRU(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, source_size, dropout, num_layers, bidirectional):
+    def __init__(self, input_dim, embed_dim, hid_dim, output_dim, source_size, dropout, num_layers, bidirectional):
         super().__init__()
-        self.dense_emb = nn.Linear(input_dim, emb_dim)
+        self.dense_emb = nn.Linear(input_dim, embed_dim)
         self.dense_out = nn.Linear(hid_dim*source_size*num_layers, output_dim)
-        self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
+        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.leakyrelu = nn.LeakyReLU()
@@ -171,10 +171,10 @@ class D_GRU(nn.Module):
         return x
 
 class Discrete_DNN(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, source_size):
+    def __init__(self, input_dim, embed_dim, hid_dim, output_dim, source_size):
         super().__init__()
-        self.dense_emb = nn.Linear(input_dim, emb_dim)
-        self.dense_hid = nn.Linear(emb_dim, hid_dim)
+        self.dense_emb = nn.Linear(input_dim, embed_dim)
+        self.dense_hid = nn.Linear(embed_dim, hid_dim)
         self.dense_out = nn.Linear(hid_dim*source_size, output_dim)
         self.dropout = nn.Dropout()
         self.relu = nn.ReLU()
@@ -192,10 +192,10 @@ class Discrete_DNN(nn.Module):
         return x
 
 class Discrete_GRU(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, source_size, num_layers, dropout, bidirectional):
+    def __init__(self, input_dim, embed_dim, hid_dim, output_dim, source_size, num_layers, dropout, bidirectional):
         super().__init__()
-        self.dense_emb = nn.Linear(input_dim, emb_dim)
-        self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
+        self.dense_emb = nn.Linear(input_dim, embed_dim)
+        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
         self.dense_out = nn.Linear(hid_dim*source_size*num_layers, output_dim)
         self.dropout = nn.Dropout()
         self.relu = nn.ReLU()
@@ -214,12 +214,19 @@ class Discrete_GRU(nn.Module):
         return x
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, output_dim, hid_dim, dropout=0.6, bidirectional=True):
+    def __init__(self, input_dim, embed_dim, output_dim, hid_dim, dropout=0.6, bidirectional=True):
         super().__init__()
         
-        self.bidirectional = bidirectional
-        self.emb = nn.Linear(input_dim, emb_dim)
-        self.enc = nn.GRU(emb_dim, hid_dim, batch_first=True, bidirectional=bidirectional)
+        # Parse paras
+        input_dim          = opt.input_dim
+        embed_dim            = opt.embed_dim 
+        hid_dim            = opt.hid_dim 
+        output_dim         = opt.output_dim
+        dropout            = opt.dropout
+        self.bidirectional = opt.bidirectional
+
+        self.emb = nn.Linear(input_dim, embed_dim)
+        self.enc = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.enc_fc = nn.Linear(hid_dim * 2, hid_dim) if bidirectional else nn.Linear(hid_dim, hid_dim)
 
@@ -255,13 +262,13 @@ class Attention(nn.Module):
         return attention
 
 class Decoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, output_dim, hid_dim, attention, dropout=0.6, bidirectional=True):
+    def __init__(self, input_dim, embed_dim, output_dim, hid_dim, attention, dropout=0.6, bidirectional=True):
         super().__init__()
         
         self.attention = attention
-        self.emb = nn.Linear(input_dim, emb_dim)
-        self.dec = nn.GRU(emb_dim, hid_dim, batch_first=True) if bidirectional else nn.GRU(emb_dim, hid_dim, batch_first=True)
-        self.dec_fc = nn.Linear(hid_dim + emb_dim, output_dim) if bidirectional else nn.Linear(hid_dim + emb_dim, output_dim)
+        self.emb = nn.Linear(input_dim, embed_dim)
+        self.dec = nn.GRU(embed_dim, hid_dim, batch_first=True) if bidirectional else nn.GRU(embed_dim, hid_dim, batch_first=True)
+        self.dec_fc = nn.Linear(hid_dim + embed_dim, output_dim) if bidirectional else nn.Linear(hid_dim + embed_dim, output_dim)
         self.att_fc = nn.Linear(hid_dim, 1)
         self.dropout = nn.Dropout(dropout)
         self.softmax = nn.Softmax(dim=-1)
@@ -290,12 +297,16 @@ class Decoder(nn.Module):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, input_dim, emb_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=True):
+    def __init__(self, input_dim, embed_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=True):
         super().__init__()
+
+        input_dim = opt.input_dim
+        embed_dim = opt.embed_dim
+
         self.device = device 
-        self.encoder = Encoder(input_dim, emb_dim, output_dim, hid_dim, dropout, bidirectional)
+        self.encoder = Encoder(input_dim, embed_dim, output_dim, hid_dim, dropout, bidirectional)
         attention = Attention(hid_dim, bidirectional)
-        self.decoder = Decoder(input_dim, emb_dim, output_dim, hid_dim, attention, dropout, bidirectional)
+        self.decoder = Decoder(input_dim, embed_dim, output_dim, hid_dim, attention, dropout, bidirectional)
 
     def forward(self, x, past_window, past_ext, teacher_force_ratio=0.6):
         # Encode
@@ -312,13 +323,13 @@ class Fudan_Encoder(nn.Module):
 
         # Parse paras
         input_dim     = opt.input_dim
-        emb_dim       = opt.emb_dim 
+        embed_dim     = opt.embed_dim 
         hid_dim       = opt.hid_dim 
         dropout       = opt.dropout
         self.bidirectional = False
 
-        self.emb = nn.Linear(input_dim, emb_dim)
-        self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
+        self.emb = nn.Linear(input_dim, embed_dim)
+        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, mode):
@@ -348,7 +359,7 @@ class Fudan_History(nn.Module):
 
         # Parse paras
         input_dim     = opt.input_dim
-        emb_dim       = opt.emb_dim 
+        embed_dim     = opt.embed_dim 
         hid_dim       = opt.hid_dim 
         dropout       = opt.dropout
         output_dim    = opt.output_dim
@@ -365,7 +376,7 @@ class Fudan_Decoder(nn.Module):
 
         # Parse paras
         input_dim     = opt.input_dim
-        emb_dim       = opt.emb_dim 
+        embed_dim     = opt.embed_dim 
         hid_dim       = opt.hid_dim 
         source_size   = opt.source_size
         dropout       = opt.dropout
@@ -374,8 +385,8 @@ class Fudan_Decoder(nn.Module):
         self.memory_size   = opt.memory_size
         self.output_dim    = opt.output_dim
         self.bidirectional = False
-        #self.emb = nn.Linear(input_dim, emb_dim)
-        #self.rnn = nn.GRU(emb_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
+        #self.emb = nn.Linear(input_dim, embed_dim)
+        #self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.hidden_fc = nn.Linear(hid_dim, 1)
         self.out_fc = nn.Linear(hid_dim, 1)

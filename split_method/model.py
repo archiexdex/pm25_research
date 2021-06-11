@@ -167,6 +167,7 @@ def fudan_test(opt, dataloader, encoder, history, decoder, device):
             # Pass through data 
             latent, hidden = encoder(x, mode=1)
             output, ext_pred = decoder(latent, hidden, history_window, past_ext)
+            output[output<0] = 0
             # Store to buffer
             ext_preds[:, j] = ext_pred[:, 0]
             outputs[:, j]   = output[:, 0]

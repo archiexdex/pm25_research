@@ -12,7 +12,7 @@ from model import *
 import csv
 
 opt = parse()
-opt.dnn = 'fudan'
+opt.model = 'fudan'
 opt.method = 'fudan'
 same_seeds(opt.seed)
 

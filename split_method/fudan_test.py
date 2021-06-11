@@ -80,6 +80,7 @@ for sitename in SITENAMES:
             latent, hidden = encoder(x, mode=1)
             output, ext_pred = decoder(latent, hidden, history_window, past_ext)
             # Store to buffer
+            output[output<0] = 0
             ext_preds[:, j] = ext_pred[:, 0]
             outputs[:, j]   = output[:, 0]
         # Record loss
