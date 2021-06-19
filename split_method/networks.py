@@ -391,7 +391,7 @@ class Fudan_Decoder(nn.Module):
         self.hidden_fc = nn.Linear(hid_dim, 1)
         self.out_fc = nn.Linear(hid_dim, 1)
         self.bias_fc = nn.Linear(1, 1)
-        self.softmax = nn.Softmax(dim=-1)
+        self.softmax = nn.Softmax(dim=1)
         self.device = device
 
     def forward(self, latent, hidden, history_window, past_ext):
@@ -434,3 +434,55 @@ class UNet_1d(nn.Module):
         x5 = torch.cat((x1, x5), dim=-1)
         x6 = self.relu(self.dense_5(x5))
         return x6
+
+class Classifier_DNN(nn.Module):
+    def __init__(self, opt):
+        super().__init__()
+        # Parameters
+        self.source_size = opt.source_size
+        target_size = opt.target_size
+        input_dim   = opt.input_dim
+        hid_dim     = opt.hid_dim
+        
+        self.fc1 = nn.Linear(input_dim, embed_dim)
+        self.dnn = nn.Linear(embed_dim, hid_dim)
+        self.fc2 = nn.Linear(hid_dim*self.source_size, hid_dim)
+        self.fc3 = nn.Linear(hid_dim, target_size)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dnn(x)
+        x = F.relu(x)
+        x = torch.flatten(x, 1)
+        x = self.fc2(x)
+        x = F.relu(x)
+        x = self.fc3(x)
+        return x
+
+class Classifier_RNN(nn.Module):
+    def __init__(self, opt):
+        super().__init__()
+        # Parameters
+        self.source_size = opt.source_size
+        target_size = opt.target_size
+        input_dim   = opt.input_dim
+        embed_dim   = opt.embed_dim
+        hid_dim     = opt.hid_dim
+        dropout     = opt.dropout
+        num_layers  = opt.num_layers
+        self.bidirectional = opt.bidirectional
+        
+        self.fc1 = nn.Linear(input_dim, embed_dim)
+        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=self.bidirectional)
+        self.fc2 = nn.Linear(hid_dim*self.source_size, hid_dim)
+        self.fc3 = nn.Linear(hid_dim, target_size)
+
+    def forward(self, x):
+        x1 = self.fc1(x)
+        x1 = F.relu(x1)
+        x1 = torch.flatten(x1, 1)
+        x2 = self.fc2(x1)
+        x2 = F.relu(x2)
+        x3 = self.fc3(x2)
+        return x3

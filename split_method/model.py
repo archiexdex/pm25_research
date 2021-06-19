@@ -8,8 +8,8 @@ def train(opt, model, dataloader, optimizer, device):
     mean_pred_loss = 0
     mean_rmse_loss = 0
     trange = tqdm(dataloader)
-    mseLoss = nn.MSELoss()
-    extLoss = EXTLoss()
+    mseLoss   = nn.MSELoss()
+    extLoss   = EXTLoss()
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, thres_y = map(lambda z: z.to(device), data)
@@ -26,7 +26,7 @@ def train(opt, model, dataloader, optimizer, device):
         # Calculate loss
         if opt.method in ["extreme", 'merged']:
             pred_loss = extLoss(y_pred, y_true)
-        else:
+        elif opt.method in ["normal"]:
             pred_loss = mseLoss(y_pred, y_true)
         mse_loss  = mseLoss(y_pred * thres_y, y_true * thres_y)
         loss = pred_loss
@@ -66,7 +66,7 @@ def test(opt, model, dataloader, device):
         # Calculate loss
         if opt.method in ["extreme", 'merged']:
             pred_loss = extLoss(y_pred, y_true)
-        else:
+        elif opt.method in ["normal"]:
             pred_loss = mseLoss(y_pred, y_true)
         mse_loss  = mseLoss(y_pred * thres_y, y_true * thres_y)
         # Record loss
@@ -177,3 +177,47 @@ def fudan_test(opt, dataloader, encoder, history, decoder, device):
         trange.set_description(f"Validation mean rmse: \33[91m>>{mean_rmse_loss / (idx+1):.3f}<<\33[0m")
     mean_rmse_loss = mean_rmse_loss / len(dataloader)
     return mean_rmse_loss
+
+def class_train(opt, dataloader, model, optimizer, device):
+    model.train()
+    mean_loss = 0
+    trange = tqdm(dataloader)
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+    loss_fn = FudanLoss().to(device)
+    for idx, data in enumerate(trange):
+        # get data
+        x, y_true = map(lambda z: z.to(device), data)
+        # get loss & update
+        _, _, _, y_pred = model(x)
+        # Calculate loss
+        loss = loss_fn(y_pred, y_true)
+        # Update model
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        # Record loss
+        mean_loss += loss.item()
+        trange.set_description(\
+            f"Training mean loss: {mean_loss / (idx+1):.3f}")
+    mean_loss /= len(dataloader)
+    return mean_loss
+
+def class_test(opt, dataloader, model, device):
+    # Validation
+    model.eval()
+    mean_loss = 0
+    trange = tqdm(dataloader)
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+    loss_fn = FudanLoss().to(device)
+    for idx, data in enumerate(trange):
+        # get data
+        x, y_true = map(lambda z: z.to(device), data)
+        # get loss & update
+        _, _, _, y_pred = model(x)
+        # Calculate loss
+        loss = loss_fn(y_pred, y_true)
+        # Record loss
+        mean_loss += loss.item()
+        trange.set_description(f"Validation mean: \33[91m>>{mean_loss / (idx+1):.3f}<<\33[0m")
+    mean_loss /= len(dataloader)
+    return  mean_loss

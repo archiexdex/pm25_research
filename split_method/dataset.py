@@ -21,14 +21,9 @@ class PMExtDataset(Dataset):
         data       = _read_file(mode=0)
         thres_data = _read_file(mode=1)
         
-        self.model        = config.model
-        self.memory_size  = config.memory_size
-        self.window_size  = config.window_size
         self.source_size  = config.source_size
         self.target_size  = config.target_size
-        self.threshold    = config.threshold
         self.shuffle      = config.shuffle
-        self.is_transform = config.is_transform
 
         data_list  = []
         thres_list = []
@@ -86,14 +81,8 @@ class PMDataset(Dataset):
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
 
-        self.model        = config.model
-        self.memory_size  = config.memory_size
-        self.window_size  = config.window_size
         self.source_size  = config.source_size
         self.target_size  = config.target_size
-        self.threshold    = config.threshold
-        self.shuffle      = config.shuffle
-        self.is_transform = config.is_transform
         self.size       = self.data.shape[0] - self.source_size - self.target_size + 1
 
     def __len__(self):
@@ -134,14 +123,8 @@ class PMDiscreteDataset(Dataset):
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
 
-        self.model        = config.model
-        self.memory_size  = config.memory_size
-        self.window_size  = config.window_size
         self.source_size  = config.source_size
         self.target_size  = config.target_size
-        self.threshold    = config.threshold
-        self.shuffle      = config.shuffle
-        self.is_transform = config.is_transform
         self.size         = self.data.shape[0] - self.source_size - self.target_size + 1
         self.mode         = mode
         
@@ -238,14 +221,8 @@ class PMUnetDataset(Dataset):
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
 
-        self.model        = config.model
-        self.memory_size  = config.memory_size
-        self.window_size  = config.window_size
         self.source_size  = config.source_size
         self.target_size  = config.target_size
-        self.threshold    = config.threshold
-        self.shuffle      = config.shuffle
-        self.is_transform = config.is_transform
         self.size         = self.data.shape[0] - self.source_size + 1
         self.isTrain      = isTrain
 
@@ -291,15 +268,11 @@ class PMFudanDataset(Dataset):
         self.thres_data = _read_file(mode=1) #[:, 7:8]
 
         self.model        = config.model
-        self.batch_size   = config.batch_size
         self.memory_size  = config.memory_size
         self.window_size  = config.window_size
         self.source_size  = config.source_size
         self.target_size  = config.target_size
         self.input_dim    = config.input_dim
-        self.threshold    = config.threshold
-        self.shuffle      = config.shuffle
-        self.is_transform = config.is_transform
         self.isTrain      = isTrain
 
         self.size = self.data.shape[0] - self.memory_size - self.window_size - self.source_size - self.target_size + 1
@@ -354,3 +327,42 @@ class PMFudanDataset(Dataset):
                 torch.FloatTensor(thres_y),\
                 torch.FloatTensor(past_windows),\
                 torch.FloatTensor(past_exts)
+
+class PMClassDataset(Dataset):
+    def __init__(self, config, sitename, isTrain=False):
+
+        def _read_file(mode):
+            if mode == 0:
+                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+            elif mode == 1:
+                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+            if os.path.exists(read_path):
+                data = np.load(read_path)
+            else:
+                raise ValueError(f"path {filename} doesn't exist")
+            return data
+
+        self.data       = _read_file(mode=0)
+        self.thres_data = _read_file(mode=1)
+
+        self.source_size  = config.source_size
+        self.target_size  = config.target_size
+        self.size         = self.data.shape[0] - self.source_size -self.target_size + 1
+        self.isTrain      = isTrain
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        """
+        """
+        st = idx
+        ed = idx + self.source_size
+        x = self.data[st:ed]
+        
+        st = idx + self.source_size
+        ed = idx + self.source_size + self.target_size
+        y = self.data[st:ed, 7:8] >= 1
+
+        return  torch.FloatTensor(x),\
+                torch.FloatTensor(y)

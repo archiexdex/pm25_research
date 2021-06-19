@@ -28,8 +28,7 @@ if not os.path.exists(rst_dir):
 
 device = get_device()
 
-name_list = []
-data_list = {"rmse": [], "f1": [], "micro": [], "macro": [], "weighted": []}
+results = []
 for sitename in SITENAMES:
     if opt.skip_site and sitename not in SAMPLE_SITES:
         continue
@@ -55,8 +54,12 @@ for sitename in SITENAMES:
     decoder.eval()
     # Parameters
     mseLoss = nn.MSELoss()
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([95/5])).to(device)
     st_time = datetime.now()
     mean_rmse_loss = 0
+    mean_pred_loss = 0
+    true_list  = None
+    pred_list  = None
     value_list = None
     trange = tqdm(test_dataloader)
     for idx, data in enumerate(trange):
@@ -82,37 +85,48 @@ for sitename in SITENAMES:
             # Store to buffer
             output[output<0] = 0
             ext_preds[:, j] = ext_pred[:, 0]
-            outputs[:, j]   = output[:, 0]
+            outputs  [:, j] = output[:, 0]
         # Record loss
-        rmse_loss  = torch.sqrt(mseLoss(outputs * thres_ys, ys * thres_ys)) 
+        rmse_loss = torch.sqrt(mseLoss(outputs * thres_ys, ys * thres_ys)) 
+        pred_loss = loss_fn(ext_preds, exts)
         mean_rmse_loss += rmse_loss.item()
+        mean_pred_loss  += pred_loss.item()
         # Recover y
         recover_y = outputs * thres_ys
-        recover_y = recover_y.cpu().detach().numpy()
-        recover_y = recover_y[:, -1]
+        ext_preds[ext_preds>= 0.05] = 1
+        ext_preds[ext_preds<  0.05] = 0
+        recover_y = recover_y[:, ].detach().cpu().numpy()
+        pred_ext  = ext_preds[:, ].detach().cpu().numpy()
+        exts      = exts     [:, ].detach().cpu().numpy()
         # Append result
         if value_list is None:
             value_list = recover_y
+            true_list  = exts
+            pred_list  = pred_ext
         else:
             value_list = np.concatenate((value_list, recover_y), axis=0)
-        trange.set_description(f"Test mean rmse: {mean_rmse_loss / (idx+1):.3f}")
-    test_loss = mean_rmse_loss / len(test_dataloader)
+            true_list  = np.concatenate((true_list, exts),       axis=0)
+            pred_list  = np.concatenate((pred_list, pred_ext),   axis=0)
+        trange.set_description(f"Test mean rmse: {mean_rmse_loss / (idx+1):.3f} pred: {mean_pred_loss / (idx+1):.3f}")
+    #test_loss = mean_rmse_loss / len(test_dataloader)
     
-    #f1, macro, micro, weighted = get_score(true_list, pred_list)
-    #name_list.append(sitename)
-    #data_list["rmse"].append(test_loss)
-    #data_list["f1"].append(f1); data_list["macro"].append(macro)
-    #data_list["micro"].append(micro); data_list["weighted"].append(weighted)
-    #print(f"f1: {f1}, macro: {macro}, micro: {micro}, weighted: {weighted}")
+    # Save the prediction value
     np.save(f"{rst_dir}/{sitename}.npy", value_list)
-
-# save quantitative analysis
-#df = pd.DataFrame({
-#    "sitename": name_list,
-#    "rmse":     data_list["rmse"],
-#    "f1":       data_list["f1"],
-#    "micro":    data_list["micro"],
-#    "macro":    data_list["macro"],
-#    "weighted": data_list["weighted"]
-#})
-#df.to_csv(f"{save_dir}/{no}_{method}.csv", index=False, encoding='utf_8_sig')
+    np.save(f"{rst_dir}/{sitename}_class.npy", pred_list)
+    # Record quantitative index
+    #precision, recall, f1, macro, micro, weighted = get_score(true_list, pred_list)
+    #print(f"precision: {precision}, recall: {recall}, f1: {f1}, macro: {macro}, micro: {micro}, weighted: {weighted}")
+    for j in range(true_list.shape[1]):
+        precision, recall, f1, macro, micro, weighted = get_score(true_list[:, j], pred_list[:, j])
+        results.append({
+            'sitename': sitename,
+            'target': j,
+            'precision': f"{precision:.3f}",
+            'recall'   : f"{recall   :.3f}",
+            'f1'       : f"{f1       :.3f}",
+            'macro'    : f"{macro    :.3f}",
+            'micro'    : f"{micro    :.3f}",
+            'weighted' : f"{weighted :.3f}"
+        })
+df = pd.DataFrame(results) 
+df.to_csv(f"{rst_dir}/{no}_qa.csv", index=False, encoding='utf_8_sig')
