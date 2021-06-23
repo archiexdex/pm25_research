@@ -266,6 +266,11 @@ class PMFudanDataset(Dataset):
 
         self.data       = _read_file(mode=0) #[:, 7:8]
         self.thres_data = _read_file(mode=1) #[:, 7:8]
+        # Calculate slope for adding extreme data
+        dif_data = self.data[1:, 7] - self.data[:-1, 7]
+        index = np.argwhere(dif_data>=15)[:, 0] + 1
+        self.mask = np.zeros((self.data.shape[0], 1))
+        self.mask[index] = 1
 
         self.model        = config.model
         self.memory_size  = config.memory_size
@@ -287,7 +292,7 @@ class PMFudanDataset(Dataset):
             # label
             st = j + self.window_size + self.target_size - 1
             ed = j + self.window_size + self.target_size
-            self.all_ext[j] = self.data[st: ed, 7:8] >= 1
+            self.all_ext[j] = np.logical_or(self.data[st: ed, 7:8] >= 1, self.mask[st:ed])
 
     def __len__(self):
         return self.size
@@ -318,7 +323,7 @@ class PMFudanDataset(Dataset):
         st = idx + self.memory_size + self.window_size + self.target_size
         ed = idx + self.memory_size + self.window_size + self.target_size + self.source_size 
         y = self.data[st:ed, 7:8]
-        y_ext = y >= 1
+        y_ext = np.logical_or(y >= 1, self.mask[st:ed])
         thres_y = self.thres_data[st:ed, 7:8]
 
         return  torch.FloatTensor(x),\
@@ -344,10 +349,16 @@ class PMClassDataset(Dataset):
 
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
+        # Calculate slope for adding extreme data
+        dif_data = self.data[1:, 7] - self.data[:-1, 7]
+        index = np.argwhere(dif_data>=15)[:, 0] + 1
+        self.mask = np.zeros((self.data.shape[0], 1))
+        self.mask[index] = 1
 
         self.source_size  = config.source_size
         self.target_size  = config.target_size
-        self.size         = self.data.shape[0] - self.source_size -self.target_size + 1
+        self.memory_size  = config.memory_size
+        self.size         = self.data.shape[0] - self.memory_size - self.source_size - self.target_size + 1
         self.isTrain      = isTrain
 
     def __len__(self):
@@ -356,13 +367,23 @@ class PMClassDataset(Dataset):
     def __getitem__(self, idx):
         """
         """
-        st = idx
-        ed = idx + self.source_size
+        st = idx 
+        ed = idx + self.memory_size
+        past_window = self.data[st:ed]
+        
+        st = idx + self.target_size 
+        ed = idx + self.memory_size + self.target_size
+        past_ext = np.logical_or(self.data[st:ed, 7:8] >= 1, self.mask[st:ed])
+        
+        st = idx + self.memory_size
+        ed = idx + self.memory_size + self.source_size
         x = self.data[st:ed]
         
-        st = idx + self.source_size
-        ed = idx + self.source_size + self.target_size
-        y = self.data[st:ed, 7:8] >= 1
+        st = idx + self.memory_size + self.source_size
+        ed = idx + self.memory_size + self.source_size + self.target_size
+        y = np.logical_or(self.data[st:ed, 7:8] >= 1, self.mask[st:ed])
 
         return  torch.FloatTensor(x),\
-                torch.FloatTensor(y)
+                torch.FloatTensor(y),\
+                torch.FloatTensor(past_window),\
+                torch.FloatTensor(past_ext)

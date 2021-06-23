@@ -39,7 +39,7 @@ for sitename in SITENAMES:
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = get_model(opt)
+    model = get_model(opt, device)
     # Load checkpoint
     model.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}.cpt")))
     # For device
@@ -55,9 +55,12 @@ for sitename in SITENAMES:
     trange = tqdm(dataloader)
     for idx, data in enumerate(trange):
         # get data
-        x, y_true = map(lambda z: z.to(device), data)
+        x, y_true, past_window, past_ext = map(lambda z: z.to(device), data)
         # get loss & update
-        _, _, _, y_pred = model(x)
+        if opt.model == "seq":
+            _, y_pred = model(x, past_window, past_ext)
+        else:
+            _, _, _, y_pred = model(x)
         
         # Calculate loss
         loss = loss_fn(y_pred, y_true)

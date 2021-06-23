@@ -186,9 +186,12 @@ def class_train(opt, dataloader, model, optimizer, device):
     loss_fn = FudanLoss().to(device)
     for idx, data in enumerate(trange):
         # get data
-        x, y_true = map(lambda z: z.to(device), data)
+        x, y_true, past_window, past_ext = map(lambda z: z.to(device), data)
         # get loss & update
-        _, _, _, y_pred = model(x)
+        if opt.model.lower() == "seq":
+            _, y_pred = model(x, past_window, past_ext) 
+        else:
+            _, _, _, y_pred = model(x)
         # Calculate loss
         loss = loss_fn(y_pred, y_true)
         # Update model
@@ -211,9 +214,12 @@ def class_test(opt, dataloader, model, device):
     loss_fn = FudanLoss().to(device)
     for idx, data in enumerate(trange):
         # get data
-        x, y_true = map(lambda z: z.to(device), data)
+        x, y_true, past_window, past_ext = map(lambda z: z.to(device), data)
         # get loss & update
-        _, _, _, y_pred = model(x)
+        if opt.model.lower() == "seq":
+            _, y_pred = model(x, past_window, past_ext) 
+        else:
+            _, _, _, y_pred = model(x)
         # Calculate loss
         loss = loss_fn(y_pred, y_true)
         # Record loss

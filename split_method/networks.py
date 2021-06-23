@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from custom_loss import *
+import random
 
 class GRU(nn.Module):
     def __init__(self, opt):
@@ -218,12 +219,12 @@ class Encoder(nn.Module):
         super().__init__()
         
         # Parse paras
-        input_dim          = opt.input_dim
-        embed_dim            = opt.embed_dim 
-        hid_dim            = opt.hid_dim 
-        output_dim         = opt.output_dim
-        dropout            = opt.dropout
-        self.bidirectional = opt.bidirectional
+        input_dim          = input_dim
+        embed_dim          = embed_dim 
+        hid_dim            = hid_dim 
+        output_dim         = output_dim
+        dropout            = dropout
+        self.bidirectional = bidirectional
 
         self.emb = nn.Linear(input_dim, embed_dim)
         self.enc = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=bidirectional)
@@ -248,73 +249,95 @@ class Attention(nn.Module):
         super().__init__()
         
         self.att = nn.Linear(hid_dim * 2 + hid_dim, hid_dim) if bidirectional else nn.Linear(hid_dim + hid_dim, hid_dim)
-        self.v = nn.Linear(hid_dim, hid_dim, bias=False)
+        self.v = nn.Linear(hid_dim, 1, bias=False)
 
     def forward(self, hidden, enc_out):
         src_len = enc_out.shape[1]
         hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
         # TODO: use torch.cat or plus both
         energy = self.att(torch.cat((enc_out, hidden), dim=-1))
-        attention = self.v(energy)
-        attention = F.softmax(attention, dim=-1)
+        a = self.v(energy).squeeze()
+        a = F.softmax(a, dim=-1)
         
-        # attention: [batch size, src len]
-        return attention
+        # a: [batch size, src len]
+        return a
 
 class Decoder(nn.Module):
     def __init__(self, input_dim, embed_dim, output_dim, hid_dim, attention, dropout=0.6, bidirectional=True):
         super().__init__()
         
+        self.bidirectional = bidirectional
+        
         self.attention = attention
         self.emb = nn.Linear(input_dim, embed_dim)
-        self.dec = nn.GRU(embed_dim, hid_dim, batch_first=True) if bidirectional else nn.GRU(embed_dim, hid_dim, batch_first=True)
-        self.dec_fc = nn.Linear(hid_dim + embed_dim, output_dim) if bidirectional else nn.Linear(hid_dim + embed_dim, output_dim)
-        self.att_fc = nn.Linear(hid_dim, 1)
+        self.dec = nn.GRU(embed_dim + hid_dim * 2, hid_dim, batch_first=True) if bidirectional else nn.GRU(embed_dim + hid_dim, hid_dim, batch_first=True)
+        self.dec_fc = nn.Linear(hid_dim, output_dim)
+        self.out_fc = nn.Linear(hid_dim*2 + hid_dim + embed_dim, output_dim) if bidirectional else nn.Linear(hid_dim + hid_dim + embed_dim, output_dim)
         self.dropout = nn.Dropout(dropout)
-        self.softmax = nn.Softmax(dim=-1)
-        self.bidirectional = bidirectional
 
-    def forward(self, x, past_hidden, past_out, past_ext):
+    def forward(self, x, hidden, enc_out):
         embed = self.emb(x)
-        embed = self.dropout(embed)
-        latent, hidden = self.dec(embed)
-        hidden = torch.cat((hidden[-2], hidden[-1]), dim=1) if self.bidirectional else hidden[-1]
-        #print(latent.shape, hidden.shape, past_out.shape)
-        a = self.attention(hidden, past_out)
+        embed = self.dropout(embed).unsqueeze(1)
+        #print("embed: ", embed.shape)
+        #print("hidden:", hidden.shape)
+        #print("enc_out: ", enc_out.shape)
+        a = self.attention(hidden, enc_out)
+        a = a.unsqueeze(1)
         #print("a ", a.shape)
-        #print("past_ext ", past_ext.shape)
-        weight = torch.bmm(past_ext.reshape(-1, past_ext.shape[2], past_ext.shape[1]), a)
-        #print(weight.shape, latent.shape)
-        output = torch.cat((latent[:, -1:], weight), dim=-1)
-        #print(output.shape)
-        #hidden = hidden.unsqueeze(0)
-        #latent, hidden = self.dec(dec_input, hidden)
-        #output = torch.cat((latent, weight, embed), dim=-1)
-        y_pred = self.att_fc(weight)
-        predict = self.dec_fc(output)
-        #print(predict.shape, y_pred.shape)
-        return predict, y_pred #hidden.squeeze() #hidden.squeeze(0)
+        weight = torch.bmm(a, enc_out)
+        #print("weight: ",  weight.shape)
+        rnn_input = torch.cat((embed, weight), dim=-1)
+        #print("rnn_input: ", rnn_input.shape)
+        output, hidden = self.dec(rnn_input, hidden.unsqueeze(0))
+        hidden = hidden.squeeze(0)
+        #print("output: ", output.shape)
+        #print("hidden:", hidden.shape)
+        prediction = self.out_fc(torch.cat((output, weight, embed), dim=-1))
+        output = self.dec_fc(output)
+        #print("output: ", output.shape)
+        #print("hidden:", hidden.shape)
+        #print("prediction:", prediction.shape)
+        return output.squeeze(-1), hidden, prediction.squeeze(-1)
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, input_dim, embed_dim, output_dim, hid_dim, device, dropout=0.6, bidirectional=True):
+    def __init__(self, opt, device):
         super().__init__()
 
-        input_dim = opt.input_dim
-        embed_dim = opt.embed_dim
+        input_dim  = opt.input_dim
+        embed_dim  = opt.embed_dim
+        hid_dim    = opt.hid_dim
+        dropout    = opt.dropout
+        bidirectional = opt.bidirectional
+        self.output_dim  = opt.output_dim
+        self.target_size = opt.target_size
+        self.device      = device
+        # Model
+        self.encoder = Encoder(input_dim, embed_dim, self.output_dim, hid_dim, dropout, bidirectional)
+        attention    = Attention(hid_dim, bidirectional)
+        self.decoder = Decoder(input_dim, embed_dim, self.output_dim, hid_dim, attention, dropout, bidirectional)
 
-        self.device = device 
-        self.encoder = Encoder(input_dim, embed_dim, output_dim, hid_dim, dropout, bidirectional)
-        attention = Attention(hid_dim, bidirectional)
-        self.decoder = Decoder(input_dim, embed_dim, output_dim, hid_dim, attention, dropout, bidirectional)
-
-    def forward(self, x, past_window, past_ext, teacher_force_ratio=0.6):
+    def forward(self, xs, past_window, past_ext, teacher_force_ratio=0.6):
+        batch_size  = xs.shape[0]
+        trg_size    = self.target_size
+        output_size = self.output_dim
+        # Tensor to store decoder outputs
+        outputs     = torch.zeros(batch_size, trg_size, output_size).to(self.device)
+        predictions = torch.zeros(batch_size, trg_size, output_size).to(self.device)
         # Encode
-        past_out, past_hidden = self.encoder(past_window)
-        # Decode
-        predict, y_pred = self.decoder(x, past_hidden, past_out, past_ext)
+        enc_out, hidden = self.encoder(past_window)
+        x = xs[:, 0]
+        for i in range(trg_size):
+            # Decode
+            output, hidden, prediction = self.decoder(x, hidden, enc_out)
+            # place predictions in a tensor holding predictions for each token
+            outputs    [:, i] = output
+            predictions[:, i] = prediction
+            # teacher force
+            #teacher_force = random.random() < teacher_force_ratio
+            x = xs[:, i] # if teacher_force else output
         
-        return predict, y_pred
+        return outputs, predictions 
 
 
 class Fudan_Encoder(nn.Module):

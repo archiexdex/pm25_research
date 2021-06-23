@@ -59,7 +59,7 @@ for sitename in SITENAMES:
     
     # Model
 
-    model = get_model(opt).to(device)
+    model = get_model(opt, device)
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     # Parameters

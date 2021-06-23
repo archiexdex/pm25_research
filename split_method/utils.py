@@ -164,10 +164,12 @@ def load_model(path, opt):
     model.load_state_dict(checkpoint)
     return model
 
-def get_model(opt):
+def get_model(opt, device):
     name = opt.model.lower()
     if name == "dnn":
         model = DNN(opt)
     elif name == "gru":
         model = GRU(opt)
-    return model
+    elif name == "seq":
+        model = Seq2Seq(opt, device)
+    return model.to(device)
