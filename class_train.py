@@ -57,6 +57,7 @@ for sitename in SITENAMES:
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
+    continue
     # Model
 
     model = get_model(opt, device)

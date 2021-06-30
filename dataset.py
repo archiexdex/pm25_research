@@ -255,7 +255,7 @@ class PMFudanDataset(Dataset):
         
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(config.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.origin_valid_dir, f"{sitename}.npy")
             elif mode == 1:
                 read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
@@ -264,13 +264,16 @@ class PMFudanDataset(Dataset):
                 raise ValueError(f"path {filename} doesn't exist")
             return data
 
-        self.data       = _read_file(mode=0) #[:, 7:8]
-        self.thres_data = _read_file(mode=1) #[:, 7:8]
+        self.data       = _read_file(mode=0)
+        self.thres_data = _read_file(mode=1)
         # Calculate slope for adding extreme data
         dif_data = self.data[1:, 7] - self.data[:-1, 7]
-        index = np.argwhere(dif_data>=15)[:, 0] + 1
+        index = np.argwhere(dif_data>=config.delta)[:, 0] + 1
         self.mask = np.zeros((self.data.shape[0], 1))
         self.mask[index] = 1
+        index = np.argwhere(self.data[:, 7]>=self.thres_data[:, 7])
+        self.mask[index] = 1
+        self.data /= self.thres_data
 
         self.model        = config.model
         self.memory_size  = config.memory_size
@@ -338,7 +341,7 @@ class PMClassDataset(Dataset):
 
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(config.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.origin_valid_dir, f"{sitename}.npy")
             elif mode == 1:
                 read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
@@ -354,6 +357,9 @@ class PMClassDataset(Dataset):
         index = np.argwhere(dif_data>=15)[:, 0] + 1
         self.mask = np.zeros((self.data.shape[0], 1))
         self.mask[index] = 1
+        index = np.argwhere(self.data[:, 7]>=self.thres_data[:, 7])
+        self.mask[index] = 1
+        self.data /= self.thres_data
 
         self.source_size  = config.source_size
         self.target_size  = config.target_size

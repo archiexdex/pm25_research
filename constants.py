@@ -1,5 +1,5 @@
 
-dataset_files = ['epa_tw_14_direction.csv',
+DATASET_FILES = ['epa_tw_14_direction.csv',
                  'epa_tw_15_direction.csv',
                  'epa_tw_16_direction.csv',
                  'epa_tw_17_direction.csv',
@@ -7,7 +7,7 @@ dataset_files = ['epa_tw_14_direction.csv',
                  'epa_tw_19_direction.csv'
                 ]
 # size of 73
-all_sitenames = [
+ALL_SITENAMES = [
     '三義', '三重', '中壢', '中山', '二林', '仁武', '冬山', '前金', '前鎮', '南投',
     '古亭', '善化', '嘉義', '土城', '埔里', '基隆', '士林', '大同', '大園', '大寮',
     '大里', '安南', '宜蘭', '小港', '屏東', '崙背', '左營', '平鎮', '彰化', '復興',
@@ -18,7 +18,7 @@ all_sitenames = [
     '頭份', '馬公', '馬祖', '鳳山', '麥寮', '龍潭', '富貴角'
     ]
 
-sitenames = [
+SITENAMES = [
  '陽明', '萬里', '淡水', '基隆', '士林', '林口', '三重', '中山', '菜寮', '大園', '汐止', '大同', '松山', '萬華',
  '觀音', '新莊', '古亭', '永和', '板橋', '桃園', '土城', '新店', '平鎮', '中壢', '湖口', '龍潭', '新竹', '竹東',
  '宜蘭', '頭份', '冬山', '苗栗', '三義', '豐原', '沙鹿', '西屯', '忠明', '線西', '大里', '彰化', '花蓮', '埔里',
@@ -27,21 +27,23 @@ sitenames = [
  '潮州', '林園', '恆春'
  ]
 
-feature_cols = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
+FEATURE_COLS = ['SO2', 'CO', 'NO', 'NO2', 'NOx', 'O3', 'PM10', 'PM2.5',
                 'RAINFALL', 'RH', 'AMB_TEMP', 'WIND_cos', 'WIND_sin',
                 'month', 'day', 'hour' 
                 ]
 
-summer_months = [5,6,7,8,9] # 1 is Junary
+SUMMER_MONTHS = [4,5,6,7,8,9] # 1 is Junary
 
-field = [
+FIELD = [
     "sitename", 
     "best_rmse",
     "epoch",
     "timestamp"
 ]
 
-sample_sites = ["湖口", "林園", "南投", "士林", "埔里", "關山"]
+#sample_sites = ["湖口", "林園", "南投", "士林", "埔里", "關山"]
+#sample_sites = ['陽明','淡水','士林','中山','萬華','觀音','古亭','永和','板橋','土城','新店']
+SAMPLE_SITES = ['陽明','中山','萬華','古亭']
 #sample_sites = ["苗栗", "頭份", "新竹", "湖口", "觀音", "竹東"]
 #sample_sites = ["林口", "桃園", "大園", "平鎮", "中壢", "龍潭"]
 #sample_sites = ["前金", "左營", "前鎮", "復興", "橋頭", "楠梓", "仁武", "小港", "鳳山"]
