@@ -12,7 +12,7 @@ from model import *
 import csv
 
 opt = parse()
-opt.method = 'class'
+opt.method = 'sa'
 same_seeds(opt.seed)
 
 if opt.no is not None:
@@ -51,14 +51,16 @@ for sitename in SITENAMES:
     print(sitename)
     
     # Dataset
-    train_dataset = PMClassDataset(sitename=sitename, opt=opt, isTrain=True)
-    valid_dataset = PMClassDataset(sitename=sitename, opt=opt, isTrain=False)
+    train_dataset = PMSADataset(sitename=sitename, opt=opt, isTrain=True)
+    valid_dataset = PMSADataset(sitename=sitename, opt=opt, isTrain=False)
 
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = get_model(opt, device)
+    enc = SAEncoder(opt, device)
+    dec = SADecoder(opt, device)
+    model = SelfAttention(enc, dec).to(device)
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     # Parameters
@@ -69,10 +71,12 @@ for sitename in SITENAMES:
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = class_train(opt, train_dataloader, model, optimizer, device)
-        valid_loss = class_test (opt, valid_dataloader, model, device)
+        train_loss = sa_train(opt, train_dataloader, model, optimizer, device)
+        valid_loss = sa_test (opt, valid_dataloader, model, device)
         if best_loss > valid_loss:
             best_loss = valid_loss
+            torch.save(enc.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}_enc.cpt"))
+            torch.save(dec.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}_dec.cpt"))
             torch.save(model.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}.cpt"))
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")

@@ -13,19 +13,21 @@ class GRU(nn.Module):
         hid_dim       = opt.hid_dim 
         output_dim    = opt.output_dim
         source_size   = opt.source_size
+        memory_size   = opt.memory_size
         dropout       = opt.dropout
         num_layers    = opt.num_layers
         bidirectional = opt.bidirectional
         self.target_size = opt.target_size
         # 
         self.dense_emb = nn.Linear(input_dim, embed_dim)
-        self.dense_out = nn.Linear(hid_dim*source_size*num_layers, output_dim*self.target_size)
+        self.dense_out = nn.Linear(hid_dim*num_layers*(memory_size + source_size), output_dim*self.target_size)
         self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.leakyrelu = nn.LeakyReLU()
     
-    def forward(self, x):
+    def forward(self, x, past_window):
+        x = torch.cat((past_window, x), dim=1)
         source_size = x.shape[1]
         emb = self.relu(self.dense_emb(x))
         hid, _ = self.rnn(emb)
@@ -45,17 +47,19 @@ class DNN(nn.Module):
         hid_dim=opt.hid_dim
         output_dim=opt.output_dim
         source_size=opt.source_size
+        memory_size = opt.memory_size
         self.target_size=opt.target_size
         # 
         self.dense_emb  = nn.Linear(input_dim, embed_dim)
         self.dense_hid  = nn.Linear(embed_dim, hid_dim)
-        self.dense_out  = nn.Linear(hid_dim*source_size, output_dim*self.target_size)
+        self.dense_out  = nn.Linear(hid_dim*(memory_size + source_size), output_dim*self.target_size)
         self.dropout    = nn.Dropout()
         self.relu       = nn.ReLU()
         self.softmax    = nn.Softmax(dim=-1)
         self.leakyrelu  = nn.LeakyReLU()
     
-    def forward(self, x):
+    def forward(self, x, past_window):
+        x = torch.cat((past_window, x), dim=1)
         source_size = x.shape[1]
         emb = self.relu(self.dense_emb(x))
         hid = self.relu(self.dense_hid(emb))
@@ -317,7 +321,7 @@ class Seq2Seq(nn.Module):
         attention    = Attention(hid_dim, bidirectional)
         self.decoder = Decoder(input_dim, embed_dim, self.output_dim, hid_dim, attention, dropout, bidirectional)
 
-    def forward(self, xs, past_window, past_ext, teacher_force_ratio=0.6):
+    def forward(self, xs, past_window, teacher_force_ratio=0.6):
         batch_size  = xs.shape[0]
         trg_size    = self.target_size
         output_size = self.output_dim
@@ -458,54 +462,271 @@ class UNet_1d(nn.Module):
         x6 = self.relu(self.dense_5(x5))
         return x6
 
-class Classifier_DNN(nn.Module):
+class MultiHeadAttentionLayer(nn.Module):
+    def __init__(self, opt, device):
+        super().__init__()
+
+        self.hid_dim = opt.hid_dim
+        self.n_heads = opt.n_heads
+        dropout = opt.dropout
+
+        assert self.hid_dim % self.n_heads == 0
+        self.head_dim = self.hid_dim // self.n_heads
+
+        self.fc_q = nn.Linear(self.hid_dim, self.hid_dim)
+        self.fc_k = nn.Linear(self.hid_dim, self.hid_dim)
+        self.fc_v = nn.Linear(self.hid_dim, self.hid_dim)
+        self.fc_o = nn.Linear(self.hid_dim, self.hid_dim)
+
+        self.dropout = nn.Dropout(dropout)
+
+        self.scale = torch.sqrt(torch.FloatTensor([self.head_dim])).to(device)
+
+    def forward(self, query, key, value):
+        #query = [batch size, query len, hid dim]
+        #key   = [batch size, key len, hid dim]
+        #value = [batch size, value len, hid dim]
+
+        batch_size = query.shape[0]
+
+        Q = self.fc_q(query)
+        K = self.fc_k(key)
+        V = self.fc_v(value)
+        #Q = [batch size, query len, hid dim]
+        #K = [batch size, key len, hid dim]
+        #V = [batch size, value len, hid dim]
+
+        Q = Q.view(batch_size, self.n_heads, -1, self.head_dim)
+        K = K.view(batch_size, self.n_heads, -1, self.head_dim)
+        V = V.view(batch_size, self.n_heads, -1, self.head_dim)
+        #Q = [batch size, n heads, query len, head dim]
+        #K = [batch size, n heads, key len, head dim]
+        #V = [batch size, n heads, value len, head dim]
+
+        energy = torch.matmul(Q, K.permute(0, 1, 3, 2)) / self.scale
+        #energy = [batch size, n heads, query len, key len]
+
+        attention = torch.softmax(energy, dim = -1)
+        #attention = [batch size, n heads, query len, key len]
+
+        x = torch.matmul(self.dropout(attention), V)
+        #x = [batch size, n heads, query len, head dim]
+
+        x = x.contiguous().view(batch_size, -1, self.hid_dim)
+        #x = [batch size, query len, hid dim]
+
+        x = self.fc_o(x)
+        #x = [batch size, query len, hid dim]
+
+        return x, attention
+
+class PositionwiseFeedforwardLayer(nn.Module):
     def __init__(self, opt):
         super().__init__()
-        # Parameters
-        self.source_size = opt.source_size
-        target_size = opt.target_size
-        input_dim   = opt.input_dim
-        hid_dim     = opt.hid_dim
+
+        hid_dim = opt.hid_dim
+        pf_dim  = opt.pf_dim
+        dropout = opt.dropout
         
-        self.fc1 = nn.Linear(input_dim, embed_dim)
-        self.dnn = nn.Linear(embed_dim, hid_dim)
-        self.fc2 = nn.Linear(hid_dim*self.source_size, hid_dim)
-        self.fc3 = nn.Linear(hid_dim, target_size)
+        self.fc_1    = nn.Linear(hid_dim, pf_dim)
+        self.fc_2    = nn.Linear(pf_dim, hid_dim)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.dnn(x)
-        x = F.relu(x)
-        x = torch.flatten(x, 1)
-        x = self.fc2(x)
-        x = F.relu(x)
-        x = self.fc3(x)
+        #x = [batch size, seq len, hid dim]
+
+        x = self.dropout(F.relu(self.fc_1(x)))
+        #x = [batch size, seq len, pf dim]
+
+        x = self.fc_2(x)
+        #x = [batch size, seq len, hid dim]
+
         return x
 
-class Classifier_RNN(nn.Module):
-    def __init__(self, opt):
+class EncoderLayer(nn.Module):
+    def __init__(self, opt, device):
         super().__init__()
-        # Parameters
-        self.source_size = opt.source_size
-        target_size = opt.target_size
-        input_dim   = opt.input_dim
-        embed_dim   = opt.embed_dim
-        hid_dim     = opt.hid_dim
-        dropout     = opt.dropout
-        num_layers  = opt.num_layers
-        self.bidirectional = opt.bidirectional
-        
-        self.fc1 = nn.Linear(input_dim, embed_dim)
-        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=self.bidirectional)
-        self.fc2 = nn.Linear(hid_dim*self.source_size, hid_dim)
-        self.fc3 = nn.Linear(hid_dim, target_size)
 
-    def forward(self, x):
-        x1 = self.fc1(x)
-        x1 = F.relu(x1)
-        x1 = torch.flatten(x1, 1)
-        x2 = self.fc2(x1)
-        x2 = F.relu(x2)
-        x3 = self.fc3(x2)
-        return x3
+        hid_dim = opt.hid_dim
+        n_heads = opt.n_heads
+        pf_dim  = opt.pf_dim
+        dropout = opt.dropout
+
+        self.self_attn_layer_norm     = nn.LayerNorm(hid_dim)
+        self.ff_layer_norm            = nn.LayerNorm(hid_dim)
+        self.self_attention           = MultiHeadAttentionLayer(opt, device)
+        self.positionwise_feedforward = PositionwiseFeedforwardLayer(opt)
+        self.dropout                  = nn.Dropout(dropout)
+
+    def forward(self, src):
+        #src = [batch size, src len, hid dim]
+
+        #self attention
+        _src, _ = self.self_attention(src, src, src)
+
+        #dropout, residual connection and layer norm
+        src = self.self_attn_layer_norm(src + self.dropout(_src))
+        #src = [batch size, src len, hid dim]
+
+        #positionwise feedforward
+        _src = self.positionwise_feedforward(src)
+
+        #dropout, residual and layer norm
+        src = self.ff_layer_norm(src + self.dropout(_src))
+        #src = [batch size, src len, hid dim]
+
+        return src
+class DecoderLayer(nn.Module):
+    def __init__(self, opt, device):
+        super().__init__()
+
+        hid_dim = opt.hid_dim
+        n_heads = opt.n_heads
+        pf_dim  = opt.pf_dim 
+        dropout = opt.dropout
+
+        self.self_attn_layer_norm     = nn.LayerNorm(hid_dim)
+        self.enc_attn_layer_norm      = nn.LayerNorm(hid_dim)
+        self.ff_layer_norm            = nn.LayerNorm(hid_dim)
+        self.self_attention           = MultiHeadAttentionLayer(opt, device)
+        self.encoder_attention        = MultiHeadAttentionLayer(opt, device)
+        self.positionwise_feedforward = PositionwiseFeedforwardLayer(opt)
+        self.dropout                  = nn.Dropout(dropout)
+
+    def forward(self, trg, enc_src):
+        #trg = [batch size, trg len, hid dim]
+        #enc_src = [batch size, src len, hid dim]
+        #trg_mask = [batch size, 1, trg len, trg len]
+        #src_mask = [batch size, 1, 1, src len]
+
+        #self attention
+        _trg, _ = self.self_attention(trg, trg, trg)
+
+        #dropout, residual connection and layer norm
+        trg = self.self_attn_layer_norm(trg + self.dropout(_trg))
+        #trg = [batch size, trg len, hid dim]
+
+        #encoder attention
+        _trg, attention = self.encoder_attention(trg, enc_src, enc_src)
+
+        #dropout, residual connection and layer norm
+        trg = self.enc_attn_layer_norm(trg + self.dropout(_trg))
+        #trg = [batch size, trg len, hid dim]
+
+        #positionwise feedforward
+        _trg = self.positionwise_feedforward(trg)
+
+        #dropout, residual and layer norm
+        trg = self.ff_layer_norm(trg + self.dropout(_trg))
+        #trg = [batch size, trg len, hid dim]
+        #attention = [batch size, n heads, trg len, src len]
+
+        return trg, attention
+
+class SAEncoder(nn.Module):
+    def __init__(self, opt, device, max_length=12):
+        super().__init__()
+
+        input_dim = opt.input_dim 
+        hid_dim   = opt.hid_dim   
+        n_layers  = opt.n_layers  
+        n_heads   = opt.n_heads   
+        pf_dim    = opt.pf_dim    
+        dropout   = opt.dropout   
+
+        self.device = device
+        
+        self.tok_embedding = nn.Linear(input_dim,  hid_dim)
+        self.pos_embedding = nn.Linear(1, hid_dim)
+        
+        self.layers = nn.ModuleList([EncoderLayer(opt, device) 
+                                     for _ in range(n_layers)])
+        self.dropout = nn.Dropout(dropout)
+        
+        self.scale = torch.sqrt(torch.FloatTensor([hid_dim])).to(device)
+        
+    def forward(self, src):
+        #src = [batch size, src len, 16]
+        
+        batch_size = src.shape[0]
+        src_len    = src.shape[1]
+        
+        #pos = torch.arange(0, src_len).reshape(1, src_len, 1).repeat(batch_size, 1, 1).to(self.device)
+        #pos = [batch size, src len, 1]
+        
+        #src = self.dropout((self.tok_embedding(src) * self.scale) + self.pos_embedding(pos))
+        src = self.dropout((self.tok_embedding(src) * self.scale))
+        #src = [batch size, src len, hid dim]
+        
+        for layer in self.layers:
+            src = layer(src)
+        #src = [batch size, src len, hid dim]
+            
+        return src
+
+class SADecoder(nn.Module):
+    def __init__(self, opt, device, max_length=12):
+        super().__init__()
+
+        input_dim  = opt.input_dim
+        output_dim = opt.output_dim
+        hid_dim    = opt.hid_dim
+        n_layers   = opt.n_layers
+        n_heads    = opt.n_heads
+        pf_dim     = opt.pf_dim
+        dropout    = opt.dropout  
+        
+        self.device = device
+        self.scale = torch.sqrt(torch.FloatTensor([hid_dim])).to(device)
+
+        self.tok_embedding = nn.Linear(input_dim, hid_dim)
+        self.pos_embedding = nn.Linear(max_length, hid_dim)
+
+        self.layers  = nn.ModuleList([DecoderLayer(opt, device) 
+                                      for _ in range(n_layers)])
+        self.fc_out  = nn.Linear(hid_dim, output_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, trg, enc_src):
+        #trg = [batch size, trg len, 1]
+        #enc_src = [batch size, src len, hid dim]
+
+        batch_size = trg.shape[0]
+        trg_len    = trg.shape[1]
+
+        #pos = torch.arange(0, trg_len).unsqueeze(0).repeat(batch_size, 1).to(self.device)
+        #pos = [batch size, trg len]
+
+        #trg = self.dropout((self.tok_embedding(trg) * self.scale) + self.pos_embedding(pos))
+        trg = self.dropout((self.tok_embedding(trg) * self.scale))
+        #trg = [batch size, trg len, hid dim]
+
+        for layer in self.layers:
+            trg, attention = layer(trg, enc_src)
+        #trg       = [batch size, trg len, hid dim]
+        #attention = [batch size, n heads, trg len, src len]
+
+        output = self.fc_out(trg)
+        #output = [batch size, trg len, output dim]
+
+        return output, attention
+    
+class SelfAttention(nn.Module):
+    def __init__(self, encoder, decoder):
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def forward(self, src, trg):
+        #src = [batch size, src len, 16]
+        #trg = [batch size, trg len, 1]
+
+        enc_src = self.encoder(src)
+        #enc_src = [batch size, src len, hid dim]
+
+        output, attention = self.decoder(trg, enc_src)
+        #output = [batch size, trg len, output dim]
+        #attention = [batch size, n heads, trg len, src len]
+
+        return output, attention
+    

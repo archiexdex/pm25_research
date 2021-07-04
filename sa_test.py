@@ -12,7 +12,7 @@ from dotted.collection import DottedDict
 
 # Test
 opt = parse()
-with open(f"{opt.cfg_dir}/{opt.no}_class.json", "r") as fp:
+with open(f"{opt.cfg_dir}/{opt.no}_sa.json", "r") as fp:
     opt = json.load(fp)
 opt = Namespace(**opt)
 same_seeds(opt.seed)
@@ -35,15 +35,17 @@ for sitename in SITENAMES:
     if opt.skip_site and sitename not in SAMPLE_SITES:
         continue
     print(sitename)
-    dataset    = PMClassDataset(sitename=sitename, opt=opt, isTrain=False)
+    dataset    = PMSADataset(sitename=sitename, opt=opt, isTrain=False)
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = get_model(opt, device)
+    enc = SAEncoder(opt, device)
+    dec = SADecoder(opt, device)
+    model = SelfAttention(enc, dec).to(device)
     # Load checkpoint
+    enc.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}_enc.cpt")))
+    dec.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}_dec.cpt")))
     model.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}.cpt")))
-    # For device
-    model.to(device)
     # Freeze model
     model.eval()
     # Parameters
@@ -55,30 +57,26 @@ for sitename in SITENAMES:
     trange = tqdm(dataloader)
     for idx, data in enumerate(trange):
         # get data
-        x, y_true, past_window, past_ext = map(lambda z: z.to(device), data)
+        x, y_true, ext_true, past_data  = map(lambda z: z.to(device), data)
         # get loss & update
-        if opt.model == "seq":
-            _, y_pred = model(x, past_window)
-        else:
-            _, _, _, y_pred = model(x, past_window)
-        
+        ext_pred, attention = model(past_data, x)
         # Calculate loss
-        loss = loss_fn(y_pred, y_true)
+        loss = loss_fn(ext_pred, ext_true)
         # Record loss
         mean_loss += loss.item()
         trange.set_description(f"Test mean: {mean_loss / (idx+1):.3f}")
         # Recover predict
-        y_pred[y_pred>=0.5] = 1
-        y_pred[y_pred<0.5]  = 0
-        y_pred = y_pred.detach().cpu().numpy()
-        y_true = y_true.detach().cpu().numpy()
+        ext_pred[ext_pred>=0.5] = 1
+        ext_pred[ext_pred<0.5]  = 0
+        ext_pred = ext_pred.detach().cpu().numpy()
+        ext_true = ext_true.detach().cpu().numpy()
         # Append result
         if pred_list is None:
-            pred_list = y_pred
-            true_list = y_true
+            pred_list = ext_pred
+            true_list = ext_true
         else:
-            pred_list = np.concatenate((pred_list, y_pred), axis=0)
-            true_list = np.concatenate((true_list, y_true), axis=0)
+            pred_list = np.concatenate((pred_list, ext_pred), axis=0)
+            true_list = np.concatenate((true_list, ext_true), axis=0)
     mean_loss /= len(dataloader)
     np.save(f"{rst_dir}/{sitename}.npy", pred_list)
     for j in [-1]:

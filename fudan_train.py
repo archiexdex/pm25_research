@@ -52,8 +52,8 @@ for sitename in SITENAMES:
     print(sitename)
     
     # Dataset
-    train_dataset = PMFudanDataset(sitename=sitename, config=opt, isTrain=True)
-    valid_dataset = PMFudanDataset(sitename=sitename, config=opt, isTrain=False)
+    train_dataset = PMFudanDataset(sitename=sitename, opt=opt, isTrain=True)
+    valid_dataset = PMFudanDataset(sitename=sitename, opt=opt, isTrain=False)
 
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)

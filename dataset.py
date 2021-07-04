@@ -3,15 +3,16 @@ from torch.utils.data import Dataset
 import os, shutil
 import numpy as np
 import random
+from utils import *
 
 class PMExtDataset(Dataset):
-    def __init__(self, config, sitename, use_ext, isTrain=False):
+    def __init__(self, opt, sitename, use_ext, isTrain=False):
         
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
             elif mode == 1:
-                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
                 data = np.load(read_path)
             else:
@@ -21,9 +22,9 @@ class PMExtDataset(Dataset):
         data       = _read_file(mode=0)
         thres_data = _read_file(mode=1)
         
-        self.source_size  = config.source_size
-        self.target_size  = config.target_size
-        self.shuffle      = config.shuffle
+        self.source_size  = opt.source_size
+        self.target_size  = opt.target_size
+        self.shuffle      = opt.shuffle
 
         data_list  = []
         thres_list = []
@@ -65,13 +66,13 @@ class PMExtDataset(Dataset):
                 torch.FloatTensor(thres_y)
 
 class PMDataset(Dataset):
-    def __init__(self, config, sitename, isTrain=False):
+    def __init__(self, opt, sitename, isTrain=False):
 
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
             elif mode == 1:
-                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
                 data = np.load(read_path)
             else:
@@ -81,8 +82,8 @@ class PMDataset(Dataset):
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
 
-        self.source_size  = config.source_size
-        self.target_size  = config.target_size
+        self.source_size  = opt.source_size
+        self.target_size  = opt.target_size
         self.size       = self.data.shape[0] - self.source_size - self.target_size + 1
 
     def __len__(self):
@@ -107,13 +108,13 @@ class PMDataset(Dataset):
                 torch.FloatTensor(thres_y)
 
 class PMDiscreteDataset(Dataset):
-    def __init__(self, config, sitename, isTrain=False, mode='all'):
+    def __init__(self, opt, sitename, isTrain=False, mode='all'):
 
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
             elif mode == 1:
-                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
                 data = np.load(read_path)
             else:
@@ -123,8 +124,8 @@ class PMDiscreteDataset(Dataset):
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
 
-        self.source_size  = config.source_size
-        self.target_size  = config.target_size
+        self.source_size  = opt.source_size
+        self.target_size  = opt.target_size
         self.size         = self.data.shape[0] - self.source_size - self.target_size + 1
         self.mode         = mode
         
@@ -205,13 +206,13 @@ class PMDiscreteDataset(Dataset):
                 torch.FloatTensor(thres_y)
 
 class PMUnetDataset(Dataset):
-    def __init__(self, config, sitename, isTrain=False):
+    def __init__(self, opt, sitename, isTrain=False):
 
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.norm_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
             elif mode == 1:
-                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
                 data = np.load(read_path)
             else:
@@ -221,8 +222,8 @@ class PMUnetDataset(Dataset):
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
 
-        self.source_size  = config.source_size
-        self.target_size  = config.target_size
+        self.source_size  = opt.source_size
+        self.target_size  = opt.target_size
         self.size         = self.data.shape[0] - self.source_size + 1
         self.isTrain      = isTrain
 
@@ -251,37 +252,36 @@ class PMUnetDataset(Dataset):
                 torch.FloatTensor(thres_y)
 
 class PMFudanDataset(Dataset):
-    def __init__(self, config, sitename, isTrain=False):
+    def __init__(self, opt, sitename, isTrain=False):
         
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.origin_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.origin_valid_dir, f"{sitename}.npy")
             elif mode == 1:
-                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
                 data = np.load(read_path)
             else:
-                raise ValueError(f"path {filename} doesn't exist")
+                raise ValueError(f"path {read_path} doesn't exist")
             return data
 
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
-        # Calculate slope for adding extreme data
-        dif_data = self.data[1:, 7] - self.data[:-1, 7]
-        index = np.argwhere(dif_data>=config.delta)[:, 0] + 1
-        self.mask = np.zeros((self.data.shape[0], 1))
-        self.mask[index] = 1
-        index = np.argwhere(self.data[:, 7]>=self.thres_data[:, 7])
-        self.mask[index] = 1
+        # Minimize the maximum threshold to opt.threshold.
+        # Sometimes, it only influence winter threshold 
+        self.mask = get_mask(opt, self.data, self.thres_data)
         self.data /= self.thres_data
 
-        self.model        = config.model
-        self.memory_size  = config.memory_size
-        self.window_size  = config.window_size
-        self.source_size  = config.source_size
-        self.target_size  = config.target_size
-        self.input_dim    = config.input_dim
+        self.model        = opt.model
+        self.memory_size  = opt.memory_size
+        self.window_size  = opt.window_size
+        self.source_size  = opt.source_size
+        self.target_size  = opt.target_size
+        self.input_dim    = opt.input_dim
         self.isTrain      = isTrain
+        # Concatenate extreme event label in data
+        if opt.is_concat_label:
+            self.data = np.concatenate((self.data, self.mask), axis=-1)
 
         self.size = self.data.shape[0] - self.memory_size - self.window_size - self.source_size - self.target_size + 1
         # Create past window input & past extreme event label
@@ -309,14 +309,13 @@ class PMFudanDataset(Dataset):
             y_ext:        [batch, target_size, 1]
         """
         # Past window, each window has a sequence of data
-        past_windows = np.zeros((self.source_size, self.memory_size, self.window_size, self.input_dim))
-        past_exts    = np.zeros((self.source_size, self.memory_size, 1)) 
+        past_window = np.zeros((self.memory_size, self.window_size, self.input_dim))
+        past_ext    = np.zeros((self.memory_size, 1)) 
         indexs = np.arange(idx + self.memory_size)
-        for k in range(past_windows.shape[0]):
-            np.random.shuffle(indexs)
-            sample = indexs[:self.memory_size]
-            past_windows[k] = self.all_window[sample]
-            past_exts[k]    = self.all_ext[sample]
+        np.random.shuffle(indexs)
+        sample = indexs[:self.memory_size]
+        past_window = self.all_window[sample]
+        past_ext    = self.all_ext[sample]
         
         # Input
         st = idx + self.memory_size + self.window_size  
@@ -333,37 +332,36 @@ class PMFudanDataset(Dataset):
                 torch.FloatTensor(y),\
                 torch.FloatTensor(y_ext),\
                 torch.FloatTensor(thres_y),\
-                torch.FloatTensor(past_windows),\
-                torch.FloatTensor(past_exts)
+                torch.FloatTensor(past_window),\
+                torch.FloatTensor(past_ext)
 
 class PMClassDataset(Dataset):
-    def __init__(self, config, sitename, isTrain=False):
+    def __init__(self, opt, sitename, isTrain=False):
 
         def _read_file(mode):
             if mode == 0:
-                read_path = os.path.join(config.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.origin_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.origin_valid_dir, f"{sitename}.npy")
             elif mode == 1:
-                read_path = os.path.join(config.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(config.thres_valid_dir, f"{sitename}.npy")
+                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
             if os.path.exists(read_path):
                 data = np.load(read_path)
             else:
-                raise ValueError(f"path {filename} doesn't exist")
+                raise ValueError(f"path {read_path} doesn't exist")
             return data
 
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
-        # Calculate slope for adding extreme data
-        dif_data = self.data[1:, 7] - self.data[:-1, 7]
-        index = np.argwhere(dif_data>=15)[:, 0] + 1
-        self.mask = np.zeros((self.data.shape[0], 1))
-        self.mask[index] = 1
-        index = np.argwhere(self.data[:, 7]>=self.thres_data[:, 7])
-        self.mask[index] = 1
+        # Minimize the maximum threshold to opt.threshold.
+        # Sometimes, it only influence winter threshold 
+        self.mask = get_mask(opt, self.data, self.thres_data)
         self.data /= self.thres_data
+        # Concatenate extreme event label in data
+        if opt.is_concat_label:
+            self.data = np.concatenate((self.data, self.mask), axis=-1)
 
-        self.source_size  = config.source_size
-        self.target_size  = config.target_size
-        self.memory_size  = config.memory_size
+        self.source_size  = opt.source_size
+        self.target_size  = opt.target_size
+        self.memory_size  = opt.memory_size
         self.size         = self.data.shape[0] - self.memory_size - self.source_size - self.target_size + 1
         self.isTrain      = isTrain
 
@@ -379,7 +377,7 @@ class PMClassDataset(Dataset):
         
         st = idx + self.target_size 
         ed = idx + self.memory_size + self.target_size
-        past_ext = np.logical_or(self.data[st:ed, 7:8] >= 1, self.mask[st:ed])
+        past_ext = self.mask[st:ed]
         
         st = idx + self.memory_size
         ed = idx + self.memory_size + self.source_size
@@ -387,9 +385,65 @@ class PMClassDataset(Dataset):
         
         st = idx + self.memory_size + self.source_size
         ed = idx + self.memory_size + self.source_size + self.target_size
-        y = np.logical_or(self.data[st:ed, 7:8] >= 1, self.mask[st:ed])
+        y = self.mask[st:ed]
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\
                 torch.FloatTensor(past_window),\
                 torch.FloatTensor(past_ext)
+
+class PMSADataset(Dataset):
+    def __init__(self, opt, sitename, isTrain=False):
+
+        def _read_file(mode):
+            if mode == 0:
+                read_path = os.path.join(opt.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.origin_valid_dir, f"{sitename}.npy")
+            elif mode == 1:
+                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
+            if os.path.exists(read_path):
+                data = np.load(read_path)
+            else:
+                raise ValueError(f"path {read_path} doesn't exist")
+            return data
+
+        self.data       = _read_file(mode=0)
+        self.thres_data = _read_file(mode=1)
+        
+        # Minimize the maximum threshold to opt.threshold.
+        # Sometimes, it only influence winter threshold 
+        self.mask = get_mask(opt, self.data, self.thres_data)
+        self.data /= self.thres_data
+        print(f"total events: {np.sum(self.mask)}, all data: {self.mask.shape[0]}, ratio: {np.sum(self.mask)/self.mask.shape[0]:.1%}")
+        # Concatenate extreme event label in data
+        if opt.is_concat_label:
+            self.data = np.concatenate((self.data, self.mask), axis=-1)
+
+        self.source_size  = opt.source_size
+        self.target_size  = opt.target_size
+        self.memory_size  = opt.memory_size
+        self.size         = self.data.shape[0] - self.memory_size - self.source_size - self.target_size + 1
+        self.isTrain      = isTrain
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        """
+        """
+        st = idx 
+        ed = idx + self.memory_size
+        past_window = self.data[st:ed]
+        
+        st = idx + self.memory_size
+        ed = idx + self.memory_size + self.source_size
+        x = self.data[st:ed]
+
+        st = idx + self.memory_size + self.target_size
+        ed = idx + self.memory_size + self.source_size + self.target_size
+        y = self.data[st:ed, 7:8]
+        y_ext = self.mask[st:ed]
+
+        return  torch.FloatTensor(x),\
+                torch.FloatTensor(y),\
+                torch.FloatTensor(y_ext),\
+                torch.FloatTensor(past_window)

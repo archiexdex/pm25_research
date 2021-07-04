@@ -80,6 +80,96 @@ def test(opt, model, dataloader, device):
         "rmse": mean_rmse_loss
     }
 
+def train_gan(G, D, dataloader, optim_g, optim_d):
+    G.train()
+    D.train()
+    mean_ext_loss = 0
+    mean_pred_loss = 0
+    mean_rmse_loss = 0
+    trange = tqdm(dataloader)
+    device = get_device()
+    mse = nn.MSELoss()
+    bce = nn.BCEWithLogitsLoss()
+    ext = EXTLoss()
+    for idx, data in enumerate(trange):
+        
+        # get data
+        x, y_true, ext_true, thres_y = map(lambda z: z.to(device), data)
+
+        # Adversarial ground truths
+        valid = torch.ones(x.shape[0], 1).to(device)
+        fake  = torch.zeros(x.shape[0], 1).to(device)
+
+        # -----------------
+        #  Train Generator
+        # -----------------
+        y_pred = G(x)
+        
+        real_d = D(y_true.detach())
+        fake_d = D(y_pred)
+
+        adv_loss = bce(fake_d - real_d.mean(0, keepdim=True), valid)
+        content_loss = ext(y_pred, y_true)
+        g_loss = adv_loss + content_loss
+
+        optim_g.zero_grad()
+        g_loss.backward()
+        optim_g.step()
+
+        # ---------------------
+        #  Train Discriminator
+        # ---------------------
+        
+        real_d = D(y_true)
+        fake_d = D(y_pred.detach())
+
+        real_loss = bce(real_d - fake_d.mean(0, keepdim=True), valid)
+        fake_loss = bce(fake_d - real_d.mean(0, keepdim=True), fake)
+
+        d_loss = (real_loss + fake_loss) / 2
+
+        optim_d.zero_grad()
+        d_loss.backward()
+        optim_d.step()
+
+        # ---------------------
+        #  Record Loss
+        # ---------------------
+        mse_loss  = mse(y_pred[:, -1] * thres_y[:, -1], y_true[:, -1] * thres_y[:, -1])
+        mean_rmse_loss += (torch.sqrt(mse_loss)).item()
+        trange.set_description(\
+            f"Training mean loss rmse: {mean_rmse_loss / (idx+1):.3f}, g adv: {adv_loss.item():.4e}, d adv: {d_loss.item():.4e}")
+    train_loss = mean_pred_loss / len(dataloader)
+    return train_loss
+
+def test_gan(model, dataloader):
+    # Validation
+    model.eval()
+    mean_ext_loss = 0
+    mean_pred_loss = 0
+    mean_rmse_loss = 0
+    trange = tqdm(dataloader)
+    device = get_device()
+    mse = nn.MSELoss()
+    for idx, data in enumerate(trange):
+        # get data
+        x, y_true, ext_true, thres_y = map(lambda z: z.to(device), data)
+        y_true = y_true[:, -1]
+        thres_y = thres_y[:, -1]
+        # get loss & update
+        y_pred = model(x)
+        # Calculate loss
+        mse_loss  = mse(y_pred[:, -1] * thres_y, y_true * thres_y)
+        # Record loss
+        mean_rmse_loss += (torch.sqrt(mse_loss)).item()
+        trange.set_description(f"Validation mean rmse: \33[91m>>{mean_rmse_loss / (idx+1):.3f}<<\33[0m")
+    valid_loss = mean_pred_loss / len(dataloader)
+    mean_rmse_loss = mean_rmse_loss / len(dataloader)
+    return {
+        "loss" : valid_loss,
+        "rmse": mean_rmse_loss
+    }
+
 def fudan_train(opt, dataloader, encoder, history, decoder, optimizer, device):
     encoder.train()
     history.train()
@@ -91,38 +181,35 @@ def fudan_train(opt, dataloader, encoder, history, decoder, optimizer, device):
     fudanLoss = FudanLoss() .to(device)
     for idx, data in enumerate(trange):
         # get data
-        xs, ys, exts, thres_ys, past_windows, past_exts = map(lambda z: z.to(device), data)
+        xs, ys, exts, thres_ys, past_window, past_ext = map(lambda z: z.to(device), data)
         
         # Tensor to store decoder outputs
-        batch_size  = xs.shape[0]
-        trg_size    = xs.shape[1]
+        #batch_size  = xs.shape[0]
+        #trg_size    = xs.shape[1]
         #window_indicators = torch.zeros(batch_size, past_window.shape[1], 1).to(self.device)
-        ext_preds = torch.zeros(batch_size, trg_size, 1).to(device)
-        outputs   = torch.zeros(batch_size, trg_size, 1).to(device)
-        mean_l2_loss = 0
-        for j in range(trg_size):
-            x           = xs[:, j:j+1]
-            past_window = past_windows[:, j]
-            past_ext    = past_exts   [:, j]
-            #print(x.shape, past_window.shape, past_ext.shape)
-            # Get history window latent
-            history_window = encoder(past_window, mode=0)
-            window_ext     = history(history_window)
-            # Update window_indicator
-            l2_loss = fudanLoss(window_ext, past_ext)
-            mean_l2_loss += l2_loss
-            # Pass through data 
-            latent, hidden = encoder(x, mode=1)
-            output, ext_pred = decoder(latent, hidden, history_window, past_ext)
-            # Store to buffer
-            #window_indicators[:, i] = window_indicator
-            #print(ext_pred.shape, output.shape)
-            ext_preds[:, j] = ext_pred[:, 0]
-            outputs[:, j]   = output[:, 0]
+        #ext_preds = torch.zeros(batch_size, trg_size, 1).to(device)
+        #outputs   = torch.zeros(batch_size, trg_size, 1).to(device)
+        #mean_l2_loss = 0
+        #for j in range(trg_size):
+        #x           = xs[:, j:j+1]
+        #past_window = past_windows[:, j]
+        #past_ext    = past_exts   [:, j]
+        # Get history window latent
+        history_window = encoder(past_window, mode=0)
+        window_ext     = history(history_window)
+        # Update window_indicator
+        l2_loss = fudanLoss(window_ext, past_ext)
+        mean_l2_loss = l2_loss
+        # Pass through data 
+        latent, hidden = encoder(xs, mode=1)
+        outputs, ext_preds = decoder(latent, hidden, history_window, past_ext)
+        # Store to buffer
+        #ext_preds[:, j] = ext_pred[:, 0]
+        #outputs[:, j]   = output[:, 0]
         # Calculate loss
         mse_loss = mseLoss(outputs, ys)
         ext_loss = fudanLoss(ext_preds, exts)
-        mean_l2_loss /= trg_size
+        #mean_l2_loss /= trg_size
         total_loss = mse_loss + ext_loss + mean_l2_loss
         # Update model
         optimizer.zero_grad()
@@ -148,29 +235,28 @@ def fudan_test(opt, dataloader, encoder, history, decoder, device):
     mseLoss = nn.MSELoss().to(device)
     for idx, data in enumerate(trange):
         # get data
-        xs, ys, exts, thres_ys, past_windows, past_exts = map(lambda z: z.to(device), data)
+        xs, ys, exts, thres_ys, past_window, past_ext = map(lambda z: z.to(device), data)
         
         # Tensor to store decoder outputs
-        batch_size  = xs.shape[0]
-        trg_size    = xs.shape[1]
+        #batch_size  = xs.shape[0]
+        #trg_size    = xs.shape[1]
         #window_indicators = torch.zeros(batch_size, past_window.shape[1], 1).to(self.device)
-        ext_preds = torch.zeros(batch_size, trg_size, 1).to(device)
-        outputs   = torch.zeros(batch_size, trg_size, 1).to(device)
-        for j in range(trg_size):
-            x           = xs[:, j:j+1]
-            past_window = past_windows[:, j]
-            past_ext    = past_exts   [:, j]
-            #print(x.shape, past_window.shape, past_ext.shape)
-            # Get history window latent
-            history_window = encoder(past_window, mode=0)
-            window_ext     = history(history_window)
-            # Pass through data 
-            latent, hidden = encoder(x, mode=1)
-            output, ext_pred = decoder(latent, hidden, history_window, past_ext)
-            output[output<0] = 0
-            # Store to buffer
-            ext_preds[:, j] = ext_pred[:, 0]
-            outputs[:, j]   = output[:, 0]
+        #ext_preds = torch.zeros(batch_size, trg_size, 1).to(device)
+        #outputs   = torch.zeros(batch_size, trg_size, 1).to(device)
+        #for j in range(trg_size):
+        #x           = xs[:, j:j+1]
+        #past_window = past_windows[:, j]
+        #past_ext    = past_exts   [:, j]
+        # Get history window latent
+        history_window = encoder(past_window, mode=0)
+        window_ext     = history(history_window)
+        # Pass through data 
+        latent, hidden = encoder(xs, mode=1)
+        outputs, ext_preds = decoder(latent, hidden, history_window, past_ext)
+        outputs[outputs<0] = 0
+        # Store to buffer
+        #ext_preds[:, j] = ext_pred[:, 0]
+        #outputs[:, j]   = output[:, 0]
         # Record loss
         rmse_loss  = torch.sqrt(mseLoss(outputs * thres_ys, ys * thres_ys)) 
         mean_rmse_loss += rmse_loss.item()
@@ -182,16 +268,19 @@ def class_train(opt, dataloader, model, optimizer, device):
     model.train()
     mean_loss = 0
     trange = tqdm(dataloader)
-    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
-    loss_fn = FudanLoss().to(device)
+    if opt.loss == "bce":
+        loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+    elif opt.loss == "fudan":
+        loss_fn = FudanLoss().to(device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, past_window, past_ext = map(lambda z: z.to(device), data)
         # get loss & update
         if opt.model.lower() == "seq":
-            _, y_pred = model(x, past_window, past_ext) 
+            _, y_pred = model(x, past_window) 
         else:
-            _, _, _, y_pred = model(x)
+            _, _, _, y_pred = model(x, past_window)
+        
         # Calculate loss
         loss = loss_fn(y_pred, y_true)
         # Update model
@@ -210,18 +299,68 @@ def class_test(opt, dataloader, model, device):
     model.eval()
     mean_loss = 0
     trange = tqdm(dataloader)
-    loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
-    loss_fn = FudanLoss().to(device)
+    if opt.loss == "bce":
+        loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+    elif opt.loss == "fudan":
+        loss_fn = FudanLoss().to(device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, past_window, past_ext = map(lambda z: z.to(device), data)
         # get loss & update
         if opt.model.lower() == "seq":
-            _, y_pred = model(x, past_window, past_ext) 
+            _, y_pred = model(x, past_window) 
         else:
-            _, _, _, y_pred = model(x)
+            _, _, _, y_pred = model(x, past_window)
         # Calculate loss
         loss = loss_fn(y_pred, y_true)
+        # Record loss
+        mean_loss += loss.item()
+        trange.set_description(f"Validation mean: \33[91m>>{mean_loss / (idx+1):.3f}<<\33[0m")
+    mean_loss /= len(dataloader)
+    return  mean_loss
+
+def sa_train(opt, dataloader, model, optimizer, device):
+    model.train()
+    mean_loss = 0
+    trange = tqdm(dataloader)
+    if opt.loss == "bce":
+        loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+    elif opt.loss == "fudan":
+        loss_fn = FudanLoss().to(device)
+    for idx, data in enumerate(trange):
+        # get data
+        x, y_true, ext_true, past_data = map(lambda z: z.to(device), data)
+        # get loss & update
+        ext_pred, _ = model(past_data, x)
+        # Calculate loss
+        loss = loss_fn(ext_pred, ext_true)
+        # Update model
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), opt.clip)
+        optimizer.step()
+        # Record loss
+        mean_loss += loss.item()
+        trange.set_description(\
+            f"Training mean loss: {mean_loss / (idx+1):.3f}")
+    mean_loss /= len(dataloader)
+    return mean_loss
+
+def sa_test(opt, dataloader, model, device):
+    model.eval()
+    mean_loss = 0
+    trange = tqdm(dataloader)
+    if opt.loss == "bce":
+        loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+    elif opt.loss == "fudan":
+        loss_fn = FudanLoss().to(device)
+    for idx, data in enumerate(trange):
+        # get data
+        x, y_true, ext_true, past_data = map(lambda z: z.to(device), data)
+        # get loss & update
+        ext_pred, _ = model(past_data, x)
+        # Calculate loss
+        loss = loss_fn(ext_pred, ext_true)
         # Record loss
         mean_loss += loss.item()
         trange.set_description(f"Validation mean: \33[91m>>{mean_loss / (idx+1):.3f}<<\33[0m")
