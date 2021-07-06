@@ -59,27 +59,24 @@ for sitename in SITENAMES:
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    encoder = Fudan_Encoder(opt, device).to(device)
-    history = Fudan_History(opt, device).to(device)
-    decoder = Fudan_Decoder(opt, device).to(device)
+    model = Fudan(opt).to(device)
     # Optimizer
-    optimizer = optim.Adam(itertools.chain(encoder.parameters(), history.parameters(), decoder.parameters()), lr=opt.lr)
+    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     # Parameters
     total_epoch = opt.total_epoch
     patience = opt.patience
     best_rmse = 1e9
-    best_loss = 1e9
+    best_pred = 1e9
     earlystop_counter = 0
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = fudan_train(opt, train_dataloader, encoder, history, decoder, optimizer, device)
-        valid_loss = fudan_test (opt, valid_dataloader, encoder, history, decoder, device)
-        if best_rmse > valid_loss:
-            best_rmse = valid_loss
-            torch.save(encoder.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}_encoder.cpt"))
-            torch.save(history.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}_history.cpt"))
-            torch.save(decoder.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}_decoder.cpt"))
+        train_rmse, train_pred = fudan_train(opt, train_dataloader, model, optimizer, device)
+        valid_rmse, valid_pred = fudan_test (opt, valid_dataloader, model, device)
+        if best_pred > valid_pred:
+            best_rmse = valid_rmse
+            best_pred = valid_pred
+            torch.save(model.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}.cpt"))
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")
 
@@ -99,4 +96,4 @@ for sitename in SITENAMES:
 # Write Record
 write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
 
-print("Done!!!")
+print(f"Finish training no: {no}, cost time: {datetime.now() - st_t}!!!")

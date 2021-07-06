@@ -267,10 +267,13 @@ class PMFudanDataset(Dataset):
 
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
-        # Minimize the maximum threshold to opt.threshold.
-        # Sometimes, it only influence winter threshold 
+
+        # Get mask label
         self.mask = get_mask(opt, self.data, self.thres_data)
         self.data /= self.thres_data
+        # Concatenate extreme event label in data
+        if opt.is_concat_label:
+            self.data = np.concatenate((self.data, self.mask), axis=-1)
 
         self.model        = opt.model
         self.memory_size  = opt.memory_size
@@ -279,9 +282,6 @@ class PMFudanDataset(Dataset):
         self.target_size  = opt.target_size
         self.input_dim    = opt.input_dim
         self.isTrain      = isTrain
-        # Concatenate extreme event label in data
-        if opt.is_concat_label:
-            self.data = np.concatenate((self.data, self.mask), axis=-1)
 
         self.size = self.data.shape[0] - self.memory_size - self.window_size - self.source_size - self.target_size + 1
         # Create past window input & past extreme event label
@@ -295,22 +295,20 @@ class PMFudanDataset(Dataset):
             # label
             st = j + self.window_size + self.target_size - 1
             ed = j + self.window_size + self.target_size
-            self.all_ext[j] = np.logical_or(self.data[st: ed, 7:8] >= 1, self.mask[st:ed])
+            self.all_ext[j] = self.mask[st:ed]
 
     def __len__(self):
         return self.size
 
     def __getitem__(self, idx):
         """
-            past_windows: [batch, target_size, window_len, 16]
-            past_ext:     [batch, target_size, window_len, 1]
-            x:            [batch, target_size, 16]
-            y:            [batch, target_size, 1]
-            y_ext:        [batch, target_size, 1]
+            past_windows: [batch, memory_size, window_len, 16]
+            past_ext:     [batch, memory_size, window_len, 1]
+            x:            [batch, source_size, 16]
+            y:            [batch, source_size, 1]
+            y_ext:        [batch, source_size, 1]
         """
         # Past window, each window has a sequence of data
-        past_window = np.zeros((self.memory_size, self.window_size, self.input_dim))
-        past_ext    = np.zeros((self.memory_size, 1)) 
         indexs = np.arange(idx + self.memory_size)
         np.random.shuffle(indexs)
         sample = indexs[:self.memory_size]
@@ -325,7 +323,7 @@ class PMFudanDataset(Dataset):
         st = idx + self.memory_size + self.window_size + self.target_size
         ed = idx + self.memory_size + self.window_size + self.target_size + self.source_size 
         y = self.data[st:ed, 7:8]
-        y_ext = np.logical_or(y >= 1, self.mask[st:ed])
+        y_ext = self.mask[st:ed]
         thres_y = self.thres_data[st:ed, 7:8]
 
         return  torch.FloatTensor(x),\
@@ -351,8 +349,8 @@ class PMClassDataset(Dataset):
 
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
-        # Minimize the maximum threshold to opt.threshold.
-        # Sometimes, it only influence winter threshold 
+
+        # Get mask label 
         self.mask = get_mask(opt, self.data, self.thres_data)
         self.data /= self.thres_data
         # Concatenate extreme event label in data
@@ -409,11 +407,10 @@ class PMSADataset(Dataset):
         self.data       = _read_file(mode=0)
         self.thres_data = _read_file(mode=1)
         
-        # Minimize the maximum threshold to opt.threshold.
-        # Sometimes, it only influence winter threshold 
+        # Get mask label 
         self.mask = get_mask(opt, self.data, self.thres_data)
         self.data /= self.thres_data
-        print(f"total events: {np.sum(self.mask)}, all data: {self.mask.shape[0]}, ratio: {np.sum(self.mask)/self.mask.shape[0]:.1%}")
+        #print(f"total events: {np.sum(self.mask)}, all data: {self.mask.shape[0]}, ratio: {np.sum(self.mask)/self.mask.shape[0]:.1%}")
         # Concatenate extreme event label in data
         if opt.is_concat_label:
             self.data = np.concatenate((self.data, self.mask), axis=-1)

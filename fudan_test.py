@@ -33,7 +33,7 @@ for sitename in SITENAMES:
     if opt.skip_site and sitename not in SAMPLE_SITES:
         continue
     print(sitename)
-    test_dataset    = PMFudanDataset(sitename=sitename, config=opt, isTrain=False)
+    test_dataset    = PMFudanDataset(sitename=sitename, opt=opt, isTrain=False)
     test_dataloader = DataLoader(test_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
@@ -64,40 +64,44 @@ for sitename in SITENAMES:
     trange = tqdm(test_dataloader)
     for idx, data in enumerate(trange):
         # get data
-        xs, ys, exts, thres_ys, past_windows, past_exts = map(lambda z: z.to(device), data)
+        xs, ys, exts, thres_ys, past_window, past_ext = map(lambda z: z.to(device), data)
         # Tensor to store decoder outputs
-        batch_size  = xs.shape[0]
-        trg_size    = xs.shape[1]
+        #batch_size  = xs.shape[0]
+        #trg_size    = xs.shape[1]
         #window_indicators = torch.zeros(batch_size, past_window.shape[1], 1).to(self.device)
-        ext_preds = torch.zeros(batch_size, trg_size, 1).to(device)
-        outputs   = torch.zeros(batch_size, trg_size, 1).to(device)
-        for j in range(trg_size):
-            x           = xs[:, j:j+1]
-            past_window = past_windows[:, j]
-            past_ext    = past_exts   [:, j]
-            #print(x.shape, past_window.shape, past_ext.shape)
-            # Get history window latent
-            history_window = encoder(past_window, mode=0)
-            window_ext     = history(history_window)
-            # Pass through data 
-            latent, hidden = encoder(x, mode=1)
-            output, ext_pred = decoder(latent, hidden, history_window, past_ext)
-            # Store to buffer
-            output[output<0] = 0
-            ext_preds[:, j] = ext_pred[:, 0]
-            outputs  [:, j] = output[:, 0]
+        #ext_preds = torch.zeros(batch_size, trg_size, 1).to(device)
+        #outputs   = torch.zeros(batch_size, trg_size, 1).to(device)
+        #for j in range(trg_size):
+        #x           = xs[:, j:j+1]
+        #past_window = past_windows[:, j]
+        #past_ext    = past_exts   [:, j]
+        #print(x.shape, past_window.shape, past_ext.shape)
+        # Get history window latent
+        history_window = encoder(past_window, mode=0)
+        window_ext     = history(history_window)
+        # Pass through data 
+        latent, hidden = encoder(xs, mode=1)
+        outputs, ext_preds = decoder(latent, hidden, history_window, past_ext)
+        # Store to buffer
+        outputs[outputs<0] = 0
+        #ext_preds[:, j] = ext_pred[:, 0]
+        #outputs  [:, j] = output[:, 0]
         # Record loss
+        outputs  = outputs [:, -1:]
+        thres_ys = thres_ys[:, -1:]
+        ys       = ys      [:, -1:]
+        exts     = exts    [:, -1:]
         rmse_loss = torch.sqrt(mseLoss(outputs * thres_ys, ys * thres_ys)) 
         pred_loss = loss_fn(ext_preds, exts)
         mean_rmse_loss += rmse_loss.item()
         mean_pred_loss  += pred_loss.item()
         # Recover y
         recover_y = outputs * thres_ys
-        ext_preds[ext_preds>= 0.05] = 1
-        ext_preds[ext_preds<  0.05] = 0
-        recover_y = recover_y[:, ].detach().cpu().numpy()
-        pred_ext  = ext_preds[:, ].detach().cpu().numpy()
-        exts      = exts     [:, ].detach().cpu().numpy()
+        ext_preds[ext_preds>= 0.5] = 1
+        ext_preds[ext_preds<  0.5] = 0
+        recover_y = recover_y.detach().cpu().numpy()
+        pred_ext  = ext_preds.detach().cpu().numpy()
+        exts      = exts     .detach().cpu().numpy()
         # Append result
         if value_list is None:
             value_list = recover_y
@@ -116,7 +120,7 @@ for sitename in SITENAMES:
     # Record quantitative index
     #precision, recall, f1, macro, micro, weighted = get_score(true_list, pred_list)
     #print(f"precision: {precision}, recall: {recall}, f1: {f1}, macro: {macro}, micro: {micro}, weighted: {weighted}")
-    for j in range(true_list.shape[1]):
+    for j in [-1]:
         precision, recall, f1, macro, micro, weighted = get_score(true_list[:, j], pred_list[:, j])
         results.append({
             'sitename': sitename,

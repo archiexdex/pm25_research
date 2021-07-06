@@ -343,7 +343,6 @@ class Seq2Seq(nn.Module):
         
         return outputs, predictions 
 
-
 class Fudan_Encoder(nn.Module):
     def __init__(self, opt, device):
         super().__init__()
@@ -425,7 +424,6 @@ class Fudan_Decoder(nn.Module):
         # hidden: [batch, 1, hid_dim]
         # latten: [batch, source_size, hid_dim]
         # attention with window
-        #print(hidden.shape, history_window[0].reshape(-1, hidden.shape[-1], 1).shape)
         alpha = [torch.bmm(hidden, window.reshape(-1, hidden.shape[-1], 1)) for window in history_window]
         alpha = torch.cat(alpha, 1)
         alpha = self.softmax(alpha)
@@ -439,6 +437,60 @@ class Fudan_Decoder(nn.Module):
         # output: [batch, 1, 1]
         return output, indicator_output
     
+class Fudan(nn.Module):
+    def __init__(self, opt):
+        super().__init__()
+        # Parse paras
+        input_dim     = opt.input_dim
+        embed_dim     = opt.embed_dim 
+        hid_dim       = opt.hid_dim 
+        source_size   = opt.source_size
+        dropout       = opt.dropout
+        num_layers    = opt.num_layers
+
+        self.memory_size   = opt.memory_size
+        self.output_dim    = opt.output_dim
+        self.bidirectional = False
+        
+        self.emb       = nn.Linear(input_dim, embed_dim)
+        self.rnn       = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
+        self.dropout   = nn.Dropout(dropout)
+        self.hidden_fc = nn.Linear(hid_dim, 1)
+        self.out_fc    = nn.Linear(hid_dim, 1)
+        self.bias_fc   = nn.Linear(hid_dim, 1)
+        self.softmax   = nn.Softmax(dim=1)
+
+    def forward(self, x, past_window, past_ext):
+        # x: [batch, source_size, features]
+        # past_window: [batch, memory_size, source_size, features]
+        # past_ext   : [batch, memory_size, 1]
+        embed = self.emb(x)
+        x_latent, x_hidden = self.rnn(embed)
+        x_hidden = torch.cat((x_hidden[-1], x_hidden[-2]), dim=1) if self.bidirectional else x_hidden[-1]
+        x_hidden = x_hidden.unsqueeze(1)
+        # latent: [batch, source_size, hid_dim]
+        # hidden: [batch, 1, hid_dim]
+        windows = [None] * past_window.shape[1]
+        for i in range(past_window.shape[1]):
+            embed = self.emb(past_window[:, i])
+            _, hidden = self.rnn(embed)
+            hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
+            hidden = hidden.unsqueeze(1)
+            windows[i] = hidden
+        window_indicator = torch.cat([self.hidden_fc(window) for window in windows], 1)
+        # window_indicator: [batch, memory_size, 1]
+        alpha = [torch.bmm(x_hidden, window.reshape(-1, x_hidden.shape[-1], 1)) for window in windows]
+        alpha = torch.cat(alpha, 1)
+        alpha = self.softmax(alpha)
+        # alpha: [batch, memory_size, 1]
+        indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
+        # indicator_output: [batch, 1, 1]
+        output = self.out_fc(x_latent)
+        #output: [batch, source_size, 1]
+        x_hidden = x_hidden.repeat(1, output.shape[1], 1)
+        bias   = self.bias_fc(x_hidden)
+        output = output + bias
+        return output, indicator_output, window_indicator 
 
 class UNet_1d(nn.Module):
     def __init__(self, c_in, c_hid):

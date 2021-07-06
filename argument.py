@@ -29,9 +29,10 @@ def add_arguments(parser):
     parser.add_argument('--is_transform',    type=int,   default=1,    help='')
     parser.add_argument('--use_ext',         action='store_true',      help='')
     parser.add_argument('--delta',           type=int,   default=10,   help='')
+    parser.add_argument('--use_abs_delta',   action='store_true',  default=True,  help='')
     parser.add_argument('--is_concat_label', action='store_true',  default=False,  help='')
 
-    parser.add_argument('--input_dim',       type=int,   default=17,  help='')
+    parser.add_argument('--input_dim',       type=int,   default=16,  help='')
     parser.add_argument('--output_dim',      type=int,   default=1,   help='')
     parser.add_argument('--embed_dim',       type=int,   default=32,  help='')
     parser.add_argument('--hid_dim',         type=int,   default=32,  help='')

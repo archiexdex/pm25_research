@@ -48,9 +48,16 @@ def parse(args=None):
     except:
         pass 
     if args is not None:
-        return parser.parse_args(args=args)
+        config = parser.parse_args(args=args)
     else:
-        return parser.parse_args()
+        config = parser.parse_args()
+    config = update_config(config)
+    return config
+
+def update_config(config):
+    if config.is_concat_label:
+        config.input_dim += 1
+    return config
 
 def save_config(config):
     no = config.no
@@ -82,6 +89,8 @@ def get_model(opt, device):
         model = GRU(opt)
     elif name == "seq":
         model = Seq2Seq(opt, device)
+    elif name == "fudan":
+        model = Fudan(opt)
     return model.to(device)
 
 def get_mask(opt, data, thres_data):
@@ -91,10 +100,12 @@ def get_mask(opt, data, thres_data):
     index = np.argwhere(_tmp>=opt.threshold)
     thres_data[index, 7] = opt.threshold
     # Calculate slope for adding extreme data
-    dif_data = abs(data[1:, 7] - data[:-1, 7])
+    # TODO: - use moving average to calculate dif_data
+    dif_data = abs(data[1:, 7] - data[:-1, 7]) if opt.use_abs_delta else data[1:, 7] - data[:-1, 7]
     index = np.argwhere(dif_data>=opt.delta)[:, 0] + 1
     mask = np.zeros((data.shape[0], 1))
     mask[index] = 1
     index = np.argwhere(data[:, 7]>=thres_data[:, 7])
     mask[index] = 1
     return mask
+
