@@ -12,7 +12,7 @@ from dotted.collection import DottedDict
 
 # Test
 opt = parse()
-with open(f"{opt.cfg_dir}/{opt.no}_sa.json", "r") as fp:
+with open(f"{opt.cfg_dir}/{opt.no}.json", "r") as fp:
     opt = json.load(fp)
 opt = Namespace(**opt)
 same_seeds(opt.seed)

@@ -20,7 +20,7 @@ class GRU(nn.Module):
         self.target_size = opt.target_size
         # 
         self.dense_emb = nn.Linear(input_dim, embed_dim)
-        self.dense_out = nn.Linear(hid_dim*num_layers*(memory_size + source_size), output_dim*self.target_size)
+        self.dense_out = nn.Linear(2*hid_dim*(memory_size + source_size), output_dim*self.target_size) if bidirectional else nn.Linear(hid_dim*(memory_size + source_size), output_dim*self.target_size)
         self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()

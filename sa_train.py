@@ -88,13 +88,13 @@ for sitename in SITENAMES:
                 print("Early stop!!!")
                 break
     print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss: .4f}")
-    train_records[sitename] = {
-        "mode": opt.method,
-        "best_rmse": None, 
-        "epoch": epoch, 
-        "timestamp": datetime.now() - st_time
-    }
+    #train_records[sitename] = {
+    #    "mode": opt.method,
+    #    "best_rmse": None, 
+    #    "epoch": epoch, 
+    #    "timestamp": datetime.now() - st_time
+    #}
 # Write Record
-write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
+#write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
 
 print(f"Finish training no: {no}, cost time: {datetime.now() - st_t}!!!")

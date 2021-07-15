@@ -63,7 +63,7 @@ def save_config(config):
     no = config.no
     method = config.method
     _config = vars(config)
-    with open(os.path.join(config.cfg_dir, f"{no}_{method}.json"), "w") as fp:
+    with open(os.path.join(config.cfg_dir, f"{no}.json"), "w") as fp:
         json.dump(_config, fp, ensure_ascii=False, indent=4)
 
 def get_score(y_true, y_pred):
@@ -96,16 +96,18 @@ def get_model(opt, device):
 def get_mask(opt, data, thres_data):
     # Minimize the maximum threshold to opt.threshold.
     # Sometimes, it only influence winter threshold 
-    _tmp = thres_data[:, 7]
-    index = np.argwhere(_tmp>=opt.threshold)
-    thres_data[index, 7] = opt.threshold
+    if opt.is_min_threshold:
+        _tmp = thres_data[:, 7]
+        index = np.argwhere(_tmp>=opt.threshold)
+        thres_data[index, 7] = opt.threshold
     # Calculate slope for adding extreme data
     # TODO: - use moving average to calculate dif_data
     dif_data = abs(data[1:, 7] - data[:-1, 7]) if opt.use_abs_delta else data[1:, 7] - data[:-1, 7]
     index = np.argwhere(dif_data>=opt.delta)[:, 0] + 1
     mask = np.zeros((data.shape[0], 1))
     mask[index] = 1
-    index = np.argwhere(data[:, 7]>=thres_data[:, 7])
-    mask[index] = 1
+    mask[data[:, 7]>=thres_data[:, 7]] = 1
+    #index = np.argwhere(data[:, 7]>=thres_data[:, 7])
+    #mask[index] = 1
     return mask
 

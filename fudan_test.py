@@ -12,7 +12,7 @@ from dotted.collection import DottedDict
 
 # Test
 opt = parse()
-with open(f"{opt.cfg_dir}/{opt.no}_fudan.json", "r") as fp:
+with open(f"{opt.cfg_dir}/{opt.no}.json", "r") as fp:
     opt = json.load(fp)
 opt = Namespace(**opt)
 same_seeds(opt.seed)
@@ -37,23 +37,16 @@ for sitename in SITENAMES:
     test_dataloader = DataLoader(test_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    encoder = Fudan_Encoder(opt, device)
-    history = Fudan_History(opt, device)
-    decoder = Fudan_Decoder(opt, device)
+    model = Fudan(opt)
     # Load checkpoint
-    encoder.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}_encoder.cpt")))
-    history.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}_history.cpt")))
-    decoder.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}_decoder.cpt")))
+    model.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}.cpt")))
     # For device
-    encoder.to(device)
-    history.to(device)
-    decoder.to(device)
+    model.to(device)
     # Freeze model
-    encoder.eval()
-    history.eval()
-    decoder.eval()
+    model.eval()
     # Parameters
-    mseLoss = nn.MSELoss()
+    mseLoss = nn.MSELoss().to(device)
+    fudanLoss = FudanLoss().to(device)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([95/5])).to(device)
     st_time = datetime.now()
     mean_rmse_loss = 0
@@ -64,53 +57,34 @@ for sitename in SITENAMES:
     trange = tqdm(test_dataloader)
     for idx, data in enumerate(trange):
         # get data
-        xs, ys, exts, thres_ys, past_window, past_ext = map(lambda z: z.to(device), data)
-        # Tensor to store decoder outputs
-        #batch_size  = xs.shape[0]
-        #trg_size    = xs.shape[1]
-        #window_indicators = torch.zeros(batch_size, past_window.shape[1], 1).to(self.device)
-        #ext_preds = torch.zeros(batch_size, trg_size, 1).to(device)
-        #outputs   = torch.zeros(batch_size, trg_size, 1).to(device)
-        #for j in range(trg_size):
-        #x           = xs[:, j:j+1]
-        #past_window = past_windows[:, j]
-        #past_ext    = past_exts   [:, j]
-        #print(x.shape, past_window.shape, past_ext.shape)
-        # Get history window latent
-        history_window = encoder(past_window, mode=0)
-        window_ext     = history(history_window)
-        # Pass through data 
-        latent, hidden = encoder(xs, mode=1)
-        outputs, ext_preds = decoder(latent, hidden, history_window, past_ext)
-        # Store to buffer
-        outputs[outputs<0] = 0
-        #ext_preds[:, j] = ext_pred[:, 0]
-        #outputs  [:, j] = output[:, 0]
-        # Record loss
-        outputs  = outputs [:, -1:]
-        thres_ys = thres_ys[:, -1:]
-        ys       = ys      [:, -1:]
-        exts     = exts    [:, -1:]
-        rmse_loss = torch.sqrt(mseLoss(outputs * thres_ys, ys * thres_ys)) 
-        pred_loss = loss_fn(ext_preds, exts)
+        x, y_true, ext_true, thres_y, past_window, past_ext = map(lambda z: z.to(device), data)
+        
+        y_pred, ext_pred, past_pred = model(x, past_window, past_ext)
+
+        # Calculate loss
+        mse_loss = mseLoss(y_pred, y_true)
+        ext_loss = fudanLoss(ext_pred, ext_true)
+        his_loss = fudanLoss(past_pred, past_ext)
+
+        rmse_loss  = torch.sqrt(mseLoss(y_pred * thres_y, y_true * thres_y)) 
         mean_rmse_loss += rmse_loss.item()
-        mean_pred_loss  += pred_loss.item()
+        mean_pred_loss += ext_loss.item()
         # Recover y
-        recover_y = outputs * thres_ys
-        ext_preds[ext_preds>= 0.5] = 1
-        ext_preds[ext_preds<  0.5] = 0
+        recover_y = y_pred * thres_y
+        ext_pred[ext_pred>= 0.5] = 1
+        ext_pred[ext_pred<  0.5] = 0
         recover_y = recover_y.detach().cpu().numpy()
-        pred_ext  = ext_preds.detach().cpu().numpy()
-        exts      = exts     .detach().cpu().numpy()
+        ext_pred  = ext_pred .detach().cpu().numpy()
+        ext_true  = ext_true .detach().cpu().numpy()
         # Append result
         if value_list is None:
             value_list = recover_y
-            true_list  = exts
-            pred_list  = pred_ext
+            true_list  = ext_true
+            pred_list  = ext_pred
         else:
             value_list = np.concatenate((value_list, recover_y), axis=0)
-            true_list  = np.concatenate((true_list, exts),       axis=0)
-            pred_list  = np.concatenate((pred_list, pred_ext),   axis=0)
+            true_list  = np.concatenate((true_list, ext_true),   axis=0)
+            pred_list  = np.concatenate((pred_list, ext_pred),   axis=0)
         trange.set_description(f"Test mean rmse: {mean_rmse_loss / (idx+1):.3f} pred: {mean_pred_loss / (idx+1):.3f}")
     #test_loss = mean_rmse_loss / len(test_dataloader)
     

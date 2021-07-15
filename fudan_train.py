@@ -44,7 +44,7 @@ os.makedirs(log_dir, 0o777)
 save_config(opt)
 
 device = get_device()
-
+st_t = datetime.now()
 train_records = {}
 for sitename in SITENAMES:
     if opt.skip_site == 1 and sitename not in SAMPLE_SITES:
@@ -87,13 +87,13 @@ for sitename in SITENAMES:
                 print("Early stop!!!")
                 break
     print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_rmse: .4f}")
-    train_records[sitename] = {
-        "mode": opt.method,
-        "best_rmse": f"{best_rmse:.3f}", 
-        "epoch": epoch, 
-        "timestamp": datetime.now() - st_time
-    }
+    #train_records[sitename] = {
+    #    "mode": opt.method,
+    #    "best_rmse": f"{best_rmse:.3f}", 
+    #    "epoch": epoch, 
+    #    "timestamp": datetime.now() - st_time
+    #}
 # Write Record
-write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
+#write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
 
 print(f"Finish training no: {no}, cost time: {datetime.now() - st_t}!!!")
