@@ -83,7 +83,7 @@ for sitename in SITENAMES:
         precision, recall, f1, macro, micro, weighted = get_score(true_list[:, j], pred_list[:, j])
         results.append({
             'sitename': sitename,
-            'target': j,
+            #'target': j,
             'precision': f"{precision:.3f}",
             'recall'   : f"{recall   :.3f}",
             'f1'       : f"{f1       :.3f}",
