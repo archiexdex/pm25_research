@@ -17,8 +17,9 @@ def add_arguments(parser):
     parser.add_argument('--total_epoch',  type=int,   default=100, help='')
     parser.add_argument('--patience',     type=int,   default=10,    help='')
     parser.add_argument('--skip_site',    action='store_true',    help='')
-    parser.add_argument('--ratio',        type=int,   default=2,    help='')
     parser.add_argument('-y', '--yes',    action='store_true',      help='')
+    parser.add_argument("--nor_load_model",           type=int, default=None,                help="the index of training process")
+    parser.add_argument("--ext_load_model",           type=int, default=None,                help="the index of training process")
 
     parser.add_argument('--memory_size',     type=int,   default=72, help='The size of histry data 8760 for one year, 6570 for 9 months, 4380 for 6 months, 2160 for 3 months, 730 for 1 month')
     parser.add_argument('--window_size',     type=int,   default=24,    help='The size of history data period, it only use in fudan model.')
@@ -30,8 +31,8 @@ def add_arguments(parser):
     parser.add_argument('--use_ext',         action='store_true',      help='')
     parser.add_argument('--is_min_threshold',action='store_true',      help='')
     parser.add_argument('--delta',           type=int,   default=10,   help='')
-    parser.add_argument('--use_abs_delta',   action='store_true',  default=True,  help='')
-    parser.add_argument('--is_concat_label', action='store_true',  default=False,  help='')
+    parser.add_argument('--use_abs_delta',   action='store_true',  help='')
+    parser.add_argument('--is_concat_label', action='store_true',  help='')
 
     parser.add_argument('--input_dim',       type=int,   default=16,  help='')
     parser.add_argument('--output_dim',      type=int,   default=1,   help='')
@@ -59,13 +60,11 @@ def add_arguments(parser):
     parser.add_argument('--mean_path',              type=str,   default="data/train_mean.json",      help='')
     parser.add_argument('--std_path',               type=str,   default="data/train_std.json",       help='')
     parser.add_argument('--threshold_path',         type=str,   default="data/train_threshold.json", help='')
+
     parser.add_argument('--cpt_dir',                type=str,   default="checkpoints",                  help='')
     parser.add_argument('--log_dir',                type=str,   default="logs",                         help='')
     parser.add_argument('--rst_dir',                type=str,   default="results",                      help='')
     parser.add_argument('--cfg_dir',                type=str,   default="configs",                      help='')
     parser.add_argument('--visual_results_dir',     type=str,   default="visual_results",               help='')
-    
-    
-    
     
     return parser
