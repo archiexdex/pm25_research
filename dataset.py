@@ -8,19 +8,8 @@ from utils import *
 class PMExtDataset(Dataset):
     def __init__(self, opt, sitename, use_ext, isTrain=False):
         
-        def _read_file(mode):
-            if mode == 0:
-                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
-            elif mode == 1:
-                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
-            if os.path.exists(read_path):
-                data = np.load(read_path)
-            else:
-                raise ValueError(f"path {filename} doesn't exist")
-            return data
-        
-        data       = _read_file(mode=0)
-        thres_data = _read_file(mode=1)
+        data       = read_file(mode=0)
+        thres_data = read_file(mode=1)
         
         self.source_size  = opt.source_size
         self.target_size  = opt.target_size
@@ -68,19 +57,8 @@ class PMExtDataset(Dataset):
 class PMDataset(Dataset):
     def __init__(self, opt, sitename, isTrain=False):
 
-        def _read_file(mode):
-            if mode == 0:
-                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
-            elif mode == 1:
-                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
-            if os.path.exists(read_path):
-                data = np.load(read_path)
-            else:
-                raise ValueError(f"path {filename} doesn't exist")
-            return data
-
-        self.data       = _read_file(mode=0)
-        self.thres_data = _read_file(mode=1)
+        self.data       = read_file(mode=0)
+        self.thres_data = read_file(mode=1)
 
         self.source_size  = opt.source_size
         self.target_size  = opt.target_size
@@ -110,19 +88,8 @@ class PMDataset(Dataset):
 class PMDiscreteDataset(Dataset):
     def __init__(self, opt, sitename, isTrain=False, mode='all'):
 
-        def _read_file(mode):
-            if mode == 0:
-                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
-            elif mode == 1:
-                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
-            if os.path.exists(read_path):
-                data = np.load(read_path)
-            else:
-                raise ValueError(f"path {filename} doesn't exist")
-            return data
-
-        self.data       = _read_file(mode=0)
-        self.thres_data = _read_file(mode=1)
+        self.data       = read_file(mode=0)
+        self.thres_data = read_file(mode=1)
 
         self.source_size  = opt.source_size
         self.target_size  = opt.target_size
@@ -208,19 +175,8 @@ class PMDiscreteDataset(Dataset):
 class PMUnetDataset(Dataset):
     def __init__(self, opt, sitename, isTrain=False):
 
-        def _read_file(mode):
-            if mode == 0:
-                read_path = os.path.join(opt.norm_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.norm_valid_dir, f"{sitename}.npy")
-            elif mode == 1:
-                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
-            if os.path.exists(read_path):
-                data = np.load(read_path)
-            else:
-                raise ValueError(f"path {filename} doesn't exist")
-            return data
-
-        self.data       = _read_file(mode=0)
-        self.thres_data = _read_file(mode=1)
+        self.data       = read_file(mode=0)
+        self.thres_data = read_file(mode=1)
 
         self.source_size  = opt.source_size
         self.target_size  = opt.target_size
@@ -254,19 +210,8 @@ class PMUnetDataset(Dataset):
 class PMFudanDataset(Dataset):
     def __init__(self, opt, sitename, isTrain=False):
         
-        def _read_file(mode):
-            if mode == 0:
-                read_path = os.path.join(opt.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.origin_valid_dir, f"{sitename}.npy")
-            elif mode == 1:
-                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
-            if os.path.exists(read_path):
-                data = np.load(read_path)
-            else:
-                raise ValueError(f"path {read_path} doesn't exist")
-            return data
-
-        self.data       = _read_file(mode=0)
-        self.thres_data = _read_file(mode=1)
+        self.data       = read_file(mode=0)
+        self.thres_data = read_file(mode=1)
 
         # Get mask label
         self.mask = get_mask(opt, self.data, self.thres_data)
@@ -336,19 +281,8 @@ class PMFudanDataset(Dataset):
 class PMClassDataset(Dataset):
     def __init__(self, opt, sitename, isTrain=False):
 
-        def _read_file(mode):
-            if mode == 0:
-                read_path = os.path.join(opt.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.origin_valid_dir, f"{sitename}.npy")
-            elif mode == 1:
-                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
-            if os.path.exists(read_path):
-                data = np.load(read_path)
-            else:
-                raise ValueError(f"path {read_path} doesn't exist")
-            return data
-
-        self.data       = _read_file(mode=0)
-        self.thres_data = _read_file(mode=1)
+        self.data       = read_file(mode=0)
+        self.thres_data = read_file(mode=1)
 
         # Get mask label 
         self.mask = get_mask(opt, self.data, self.thres_data)
@@ -393,19 +327,10 @@ class PMClassDataset(Dataset):
 class PMSADataset(Dataset):
     def __init__(self, opt, sitename, isTrain=False):
 
-        def _read_file(mode):
-            if mode == 0:
-                read_path = os.path.join(opt.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.origin_valid_dir, f"{sitename}.npy")
-            elif mode == 1:
-                read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
-            if os.path.exists(read_path):
-                data = np.load(read_path)
-            else:
-                raise ValueError(f"path {read_path} doesn't exist")
-            return data
+        self.opt = opt
 
-        self.data       = _read_file(mode=0)
-        self.thres_data = _read_file(mode=1)
+        self.data       = read_file(sitename, opt, mode=0, isTrain=isTrain)
+        self.thres_data = read_file(sitename, opt, mode=1, isTrain=isTrain)
         
         # Get mask label 
         self.mask = get_mask(opt, self.data, self.thres_data)
@@ -415,11 +340,10 @@ class PMSADataset(Dataset):
         if opt.is_concat_label:
             self.data = np.concatenate((self.data, self.mask), axis=-1)
 
-        self.source_size  = opt.source_size
-        self.target_size  = opt.target_size
-        self.memory_size  = opt.memory_size
-        self.size         = self.data.shape[0] - self.memory_size - self.source_size - self.target_size + 1
-        self.isTrain      = isTrain
+        self.size         = self.data.shape[0] - opt.memory_size - opt.source_size - opt.target_size + 1
+
+    def get_ratio(self):
+        return 1-np.sum(self.mask) / self.mask.shape[0]
 
     def __len__(self):
         return self.size
@@ -428,15 +352,15 @@ class PMSADataset(Dataset):
         """
         """
         st = idx 
-        ed = idx + self.memory_size
+        ed = idx + self.opt.memory_size
         past_window = self.data[st:ed]
         
-        st = idx + self.memory_size
-        ed = idx + self.memory_size + self.source_size
+        st = idx + self.opt.memory_size
+        ed = idx + self.opt.memory_size + self.opt.source_size
         x = self.data[st:ed]
 
-        st = idx + self.memory_size + self.target_size
-        ed = idx + self.memory_size + self.source_size + self.target_size
+        st = idx + self.opt.memory_size + self.opt.target_size
+        ed = idx + self.opt.memory_size + self.opt.source_size + self.opt.target_size
         y = self.data[st:ed, 7:8]
         y_ext = self.mask[st:ed]
 

@@ -75,9 +75,9 @@ def get_score(y_true, y_pred):
     weighted  = f1_score       (y_true, y_pred, zero_division=0, average='weighted')
     return precision, recall, f1, macro, micro, weighted
 
-def load_model(path, opt):
+def load_model(path, opt, device):
     checkpoint = torch.load(path)
-    model = get_model(opt)
+    model = get_model(opt, device)
     model.load_state_dict(checkpoint)
     return model
 
@@ -91,10 +91,23 @@ def get_model(opt, device):
         model = Seq2Seq(opt, device)
     elif name == "fudan":
         model = Fudan(opt)
-    return model.to(device)
+    elif name == "transformer":
+        model = SelfAttention(opt, device)
+    return model
+
+def read_file(sitename, opt, mode, isTrain):
+    if mode == 0:
+        read_path = os.path.join(opt.origin_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.origin_valid_dir, f"{sitename}.npy")
+    elif mode == 1:
+        read_path = os.path.join(opt.thres_train_dir, f"{sitename}.npy") if isTrain else os.path.join(opt.thres_valid_dir, f"{sitename}.npy")
+    if os.path.exists(read_path):
+        data = np.load(read_path)
+    else:
+        raise ValueError(f"path {read_path} doesn't exist")
+    return data
 
 def get_mask(opt, data, thres_data):
-    # Minimize the maximum threshold to opt.threshold.
+    # Limit the maximum threshold to opt.threshold.
     # Sometimes, it only influence winter threshold 
     if opt.is_min_threshold:
         _tmp = thres_data[:, 7]
@@ -107,7 +120,4 @@ def get_mask(opt, data, thres_data):
     mask = np.zeros((data.shape[0], 1))
     mask[index] = 1
     mask[data[:, 7]>=thres_data[:, 7]] = 1
-    #index = np.argwhere(data[:, 7]>=thres_data[:, 7])
-    #mask[index] = 1
     return mask
-
