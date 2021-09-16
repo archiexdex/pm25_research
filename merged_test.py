@@ -27,7 +27,6 @@ if not os.path.exists(rst_dir):
     os.makedirs(rst_dir, 0o777)
 
 device = get_device()
-st_time = datetime.now()
 
 name_list = []
 data_list = {"f1": [], "micro": [], "macro": [], "weighted": []}
@@ -38,20 +37,30 @@ for sitename in SITENAMES:
     print(sitename)
     # In here, only use for get the ratio
     train_dataset = PMSADataset(sitename=sitename, opt=opt, isTrain=True)
+
     dataset    = PMSADataset(sitename=sitename, opt=opt, isTrain=False)
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = SelfAttention(opt, device).to(device)
-    # Load checkpoint
-    model.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}.cpt")))
+    assert opt.nor_load_model != None, f"Merged method should determine the load model"
+    assert opt.ext_load_model != None, f"Merged method should determine the load model"
+    nor_load_path = os.path.join(opt.cpt_dir, str(opt.nor_load_model), f"{sitename}_sa.cpt")
+    ext_load_path = os.path.join(opt.cpt_dir, str(opt.ext_load_model), f"{sitename}_sa.cpt")
+    nor_model = load_model(nor_load_path, opt, device)
+    ext_model = load_model(ext_load_path, opt, device)
+    
+    model = Merged_Transformer(opt, nor_model, ext_model)
+    load_path = os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_merged_transformer.cpt")
+    model.load_state_dict(torch.load(load_path))
+    model.to(device)
+
     # Freeze model
     model.eval()
     # Parameters
     ratio = train_dataset.get_ratio()
     print(f"ratio: {ratio: .3%}, pos_weight: {ratio/(1-ratio):.2f}")
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([(ratio/(1-ratio))])).to(device)
-    #loss_fn = nn.BCEWithLogitsLoss().to(device)
+    st_time = datetime.now()
     mean_loss = 0
     pred_list = None
     true_list = None
@@ -60,7 +69,7 @@ for sitename in SITENAMES:
         # get data
         x, y_true, ext_true, past_data  = map(lambda z: z.to(device), data)
         # get loss & update
-        ext_pred, _, attention = model(past_data, x)
+        ext_pred, _, _ = model(past_data, x)
         # Calculate loss
         loss = loss_fn(ext_pred, ext_true)
         # Record loss

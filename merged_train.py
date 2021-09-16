@@ -12,7 +12,8 @@ from model import *
 import csv
 
 opt = parse()
-opt.method = 'sa'
+opt.method = 'merged_transformer'
+opt.model = "transformer"
 same_seeds(opt.seed)
 
 if opt.no is not None:
@@ -42,6 +43,14 @@ os.makedirs(cpt_dir, 0o777)
 os.makedirs(log_dir, 0o777)
 save_config(opt)
 
+def load_sa(opt, name, sitename):
+    load_path = os.path.join(opt.cpt_dir, name, f"{sitename}_sa.cpt")
+    checkpoint = torch.load(path)
+    model = get_model(opt)
+    model.load_state_dict(checkpoint)
+    return model
+    
+
 device = get_device()
 st_t = datetime.now()
 train_records = {}
@@ -62,9 +71,19 @@ for sitename in SITENAMES:
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = SelfAttention(opt, device).to(device)
+    assert opt.nor_load_model != None, f"Merged method should determine the load model"
+    assert opt.ext_load_model != None, f"Merged method should determine the load model"
+    nor_load_path = os.path.join(opt.cpt_dir, str(opt.nor_load_model), f"{sitename}_sa.cpt")
+    ext_load_path = os.path.join(opt.cpt_dir, str(opt.ext_load_model), f"{sitename}_sa.cpt")
+    nor_model = load_model(nor_load_path, opt, device)
+    ext_model = load_model(ext_load_path, opt, device)
+    for p in nor_model.parameters():
+        p.requires_grad = False
+    for p in ext_model.parameters():
+        p.requires_grad = False
+    model = Merged_Transformer(opt, nor_model, ext_model).to(device)
     # Optimizer
-    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=opt.lr)
     # Parameters
     total_epoch = opt.total_epoch
     patience = opt.patience
@@ -88,13 +107,4 @@ for sitename in SITENAMES:
                 print("Early stop!!!")
                 break
     print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss: .4f}")
-    #train_records[sitename] = {
-    #    "mode": opt.method,
-    #    "best_rmse": None, 
-    #    "epoch": epoch, 
-    #    "timestamp": datetime.now() - st_time
-    #}
-# Write Record
-#write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
-
 print(f"Finish training no: {no}, cost time: {datetime.now() - st_t}!!!")
