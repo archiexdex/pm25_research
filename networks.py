@@ -676,7 +676,7 @@ class DecoderLayer(nn.Module):
         return trg, attention
 
 class SAEncoder(nn.Module):
-    def __init__(self, opt, device, max_length=12):
+    def __init__(self, opt, device):
         super().__init__()
 
         input_dim = opt.input_dim 
@@ -689,6 +689,8 @@ class SAEncoder(nn.Module):
         self.device = device
         
         self.tok_embedding = nn.Linear(input_dim,  hid_dim)
+        self.feature_embedding = nn.Linear(8,  hid_dim)
+        self.weather_embedding = nn.Linear(input_dim-8,  hid_dim)
         self.pos_embedding = nn.Linear(1, hid_dim)
         
         self.layers = nn.ModuleList([EncoderLayer(opt, device) 
@@ -703,11 +705,16 @@ class SAEncoder(nn.Module):
         batch_size = src.shape[0]
         src_len    = src.shape[1]
         
-        #pos = torch.arange(0, src_len).reshape(1, src_len, 1).repeat(batch_size, 1, 1).to(self.device)
+        pos = torch.arange(start=0, end=src_len, dtype=torch.float32, requires_grad=True).reshape(1, src_len, 1).repeat(batch_size, 1, 1).to(self.device)
         #pos = [batch size, src len, 1]
         
         #src = self.dropout((self.tok_embedding(src) * self.scale) + self.pos_embedding(pos))
-        src = self.dropout((self.tok_embedding(src) * self.scale))
+        #src = self.dropout((self.tok_embedding(src) * self.scale))
+        feature_src = (self.feature_embedding(src[:, :, :8]) * self.scale)
+        weather_src = (self.weather_embedding(src[:, :, 8:]) * self.scale)
+        src = self.dropout(feature_src + weather_src)
+        #pos = self.pos_embedding(pos)
+        #src = self.dropout(src + pos)
         #src = [batch size, src len, hid dim]
         
         for layer in self.layers:
@@ -761,13 +768,13 @@ class SADecoder(nn.Module):
         output = self.fc_out(trg)
         #output = [batch size, trg len, output dim]
 
-        return output, attention
+        return output, trg, attention
     
 class SelfAttention(nn.Module):
-    def __init__(self, encoder, decoder):
+    def __init__(self, opt, device):
         super().__init__()
-        self.encoder = encoder
-        self.decoder = decoder
+        self.encoder = SAEncoder(opt, device)
+        self.decoder = SADecoder(opt, device)
 
     def forward(self, src, trg):
         #src = [batch size, src len, 16]
@@ -776,9 +783,31 @@ class SelfAttention(nn.Module):
         enc_src = self.encoder(src)
         #enc_src = [batch size, src len, hid dim]
 
-        output, attention = self.decoder(trg, enc_src)
+        output, hidden, attention = self.decoder(trg, enc_src)
         #output = [batch size, trg len, output dim]
+        #hidden = [batch size, trg len, hid dim]
         #attention = [batch size, n heads, trg len, src len]
 
-        return output, attention
-    
+        return output, hidden, attention
+
+class Merged_Transformer(nn.Module):
+    def __init__(self, opt, nor_model, ext_model):
+        super().__init__()
+        self.nor_model = nor_model
+        self.ext_model = ext_model
+        self.fc_out  = nn.Linear(opt.hid_dim<<1, opt.output_dim)
+        self.dropout = nn.Dropout(opt.dropout)
+
+    def forward(self, src, trg):
+        #src = [batch size, src len, 16]
+        #trg = [batch size, trg len, 1]
+
+        nor_output, nor_hidden, nor_attention = self.nor_model(src, trg)
+        ext_output, ext_hidden, ext_attention = self.ext_model(src, trg)
+        #output = [batch size, trg len, output dim]
+        #hidden = [batch size, trg len, hid dim]
+        #attention = [batch size, n heads, trg len, src len]
+        hidden = torch.cat((nor_hidden, ext_hidden), dim=-1)
+        output = self.fc_out(hidden)
+
+        return output, hidden, ext_attention

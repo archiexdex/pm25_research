@@ -292,15 +292,15 @@ def sa_train(opt, dataloader, model, optimizer, device):
     mean_loss = 0
     trange = tqdm(dataloader)
     if opt.loss == "bce":
-        loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
-        #loss_fn = nn.BCEWithLogitsLoss().to(device)
-    elif opt.loss == "fudan":
-        loss_fn = FudanLoss().to(device)
+        #loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+        loss_fn = nn.BCEWithLogitsLoss().to(device)
+    elif opt.loss == "evl":
+        loss_fn = EVLoss(alpha=opt.ratio, gamma=1).to(device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, past_data = map(lambda z: z.to(device), data)
         # get loss & update
-        ext_pred, _ = model(past_data, x)
+        ext_pred, _, _ = model(past_data, x)
         # Calculate loss
         loss = loss_fn(ext_pred, ext_true)
         # Update model
@@ -320,15 +320,15 @@ def sa_test(opt, dataloader, model, device):
     mean_loss = 0
     trange = tqdm(dataloader)
     if opt.loss == "bce":
-        loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
-        #loss_fn = nn.BCEWithLogitsLoss().to(device)
-    elif opt.loss == "fudan":
-        loss_fn = FudanLoss().to(device)
+        #loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(95/5)).to(device)
+        loss_fn = nn.BCEWithLogitsLoss().to(device)
+    elif opt.loss == "evl":
+        loss_fn = EVLoss(alpha=opt.ratio, gamma=1).to(device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, past_data = map(lambda z: z.to(device), data)
         # get loss & update
-        ext_pred, _ = model(past_data, x)
+        ext_pred, _, _ = model(past_data, x)
         # Calculate loss
         loss = loss_fn(ext_pred, ext_true)
         # Record loss
