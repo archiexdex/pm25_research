@@ -13,7 +13,31 @@ import csv
 torch.autograd.set_detect_anomaly(True)
 
 def get_device():
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+def check_train_id(opt):
+    assert opt.no != None, f"no should be a number"
+
+def build_dirs(opt):
+    try:
+        cfg_dir = os.makedirs(os.path.join(opt.cfg_dir), 0o777)
+    except:
+        pass
+    cpt_dir = os.path.join(opt.cpt_dir, str(opt.no))
+    log_dir = os.path.join(opt.log_dir, str(opt.no))
+
+    if (not opt.yes) and os.path.exists(cpt_dir):
+        res = input(f"no: {no} exists, are you sure continue training? It will override all files.[y:N]")
+        res = res.lower()
+        assert res in ["y", "yes"], "Stop training!!"
+        print("Override all files.")
+
+    if os.path.exists(cpt_dir):
+        shutil.rmtree(cpt_dir)
+    if os.path.exists(log_dir):
+        shutil.rmtree(log_dir)
+    os.makedirs(cpt_dir, 0o777)
+    os.makedirs(log_dir, 0o777)
 
 def write_record(path, records):
     header = ["sitename", "mode", "best_rmse", "epoch", "cost_time"]
@@ -75,24 +99,24 @@ def get_score(y_true, y_pred):
     weighted  = f1_score       (y_true, y_pred, zero_division=0, average='weighted')
     return precision, recall, f1, macro, micro, weighted
 
-def load_model(path, opt, device):
+def load_model(path, opt):
     checkpoint = torch.load(path)
-    model = get_model(opt, device)
+    model = get_model(opt)
     model.load_state_dict(checkpoint)
     return model
 
-def get_model(opt, device):
+def get_model(opt):
     name = opt.model.lower()
     if name == "dnn":
         model = DNN(opt)
-    elif name == "gru":
-        model = GRU(opt)
+    elif name == "rnn":
+        model = RNN(opt)
     elif name == "seq":
-        model = Seq2Seq(opt, device)
+        model = Seq2Seq(opt)
     elif name == "fudan":
         model = Fudan(opt)
     elif name == "transformer":
-        model = SelfAttention(opt, device)
+        model = Transformer(opt)
     return model
 
 def read_file(sitename, opt, mode, isTrain):
@@ -121,3 +145,30 @@ def get_mask(opt, data, thres_data):
     mask[index] = 1
     mask[data[:, 7]>=thres_data[:, 7]] = 1
     return mask
+
+def get_split_dataset(opt, data):
+    """
+        data: [data len, 17] 
+        mode: 'norm', 'ext'
+    """
+    mask = data[:, -1]
+    size = data.shape[0]
+    shift = opt.memory_size + opt.source_size + opt.target_size
+
+    if opt.split_mode == "norm":
+        _data = []
+        for i in range(size - shift) :
+            tmp = data[i: i + shift]
+            # check whether the extreme event is in the target_size? 
+            if np.sum(tmp[shift - opt.target_size: , -1]) < 1:
+                _data.append(tmp)
+        
+    elif opt.split_mode == "ext":
+        _data = []
+        for i in range(size - shift) :
+            tmp = data[i: i + shift]
+            # check whether the extreme event is in the target_size? 
+            if np.sum(tmp[shift - opt.target_size: , -1]) > 0:
+                _data.append(tmp)
+
+    return np.array(_data)

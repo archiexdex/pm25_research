@@ -12,37 +12,18 @@ from model import *
 import csv
 
 opt = parse()
-opt.method = 'sa'
+opt.method = 'transformer'
+opt.model  = 'transformer'
 same_seeds(opt.seed)
 
-if opt.no is not None:
-    no = opt.no
-else:
-    print("n is not a number")
-    exit()
+device = get_device()
+opt.device = device
 
-try:
-    cfg_dir = os.makedirs(os.path.join(opt.cfg_dir), 0o777)
-except:
-    pass
-cpt_dir = os.path.join(opt.cpt_dir, str(no))
-log_dir = os.path.join(opt.log_dir, str(no))
-if (not opt.yes) and os.path.exists(cpt_dir):
-    res = input(f"no: {no} exists, are you sure continue training? It will override all files.[y:N]")
-    res = res.lower()
-    if res not in ["y", "yes"]:
-        print("Stop training")
-        exit()
-    print("Override all files.")
-if os.path.exists(cpt_dir):
-    shutil.rmtree(cpt_dir)
-if os.path.exists(log_dir):
-    shutil.rmtree(log_dir)
-os.makedirs(cpt_dir, 0o777)
-os.makedirs(log_dir, 0o777)
+check_train_id(opt)
+build_dirs(opt)
+
 save_config(opt)
 
-device = get_device()
 st_t = datetime.now()
 train_records = {}
 for sitename in SITENAMES:
@@ -51,8 +32,8 @@ for sitename in SITENAMES:
     print(sitename)
     
     # Dataset
-    train_dataset = PMSADataset(sitename=sitename, opt=opt, isTrain=True)
-    valid_dataset = PMSADataset(sitename=sitename, opt=opt, isTrain=False)
+    train_dataset = PMDataset(sitename=sitename, opt=opt, isTrain=True)
+    valid_dataset = PMDataset(sitename=sitename, opt=opt, isTrain=False)
 
     # Get ratio
     opt.ratio = train_dataset.get_ratio()
@@ -62,7 +43,7 @@ for sitename in SITENAMES:
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = SelfAttention(opt, device).to(device)
+    model = Transformer(opt, device).to(device)
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     # Parameters
@@ -73,8 +54,8 @@ for sitename in SITENAMES:
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = sa_train(opt, train_dataloader, model, optimizer, device)
-        valid_loss = sa_test (opt, valid_dataloader, model, device)
+        train_loss = tf_train(opt, train_dataloader, model, optimizer, device)
+        valid_loss = tf_test (opt, valid_dataloader, model, device)
         if best_loss > valid_loss:
             best_loss = valid_loss
             torch.save(model.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}.cpt"))
@@ -88,13 +69,5 @@ for sitename in SITENAMES:
                 print("Early stop!!!")
                 break
     print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss: .4f}")
-    #train_records[sitename] = {
-    #    "mode": opt.method,
-    #    "best_rmse": None, 
-    #    "epoch": epoch, 
-    #    "timestamp": datetime.now() - st_time
-    #}
-# Write Record
-#write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
 
 print(f"Finish training no: {no}, cost time: {datetime.now() - st_t}!!!")

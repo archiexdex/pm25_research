@@ -16,6 +16,7 @@ with open(f"{opt.cfg_dir}/{opt.no}.json", "r") as fp:
     opt = json.load(fp)
 opt = Namespace(**opt)
 same_seeds(opt.seed)
+opt.split_dataset = None
 
 no = opt.no
 method = opt.method
@@ -37,12 +38,12 @@ for sitename in SITENAMES:
         continue
     print(sitename)
     # In here, only use for get the ratio
-    train_dataset = PMSADataset(sitename=sitename, opt=opt, isTrain=True)
-    dataset    = PMSADataset(sitename=sitename, opt=opt, isTrain=False)
+    train_dataset = PMDataset(sitename=sitename, opt=opt, isTrain=True)
+    dataset    = PMDataset(sitename=sitename, opt=opt, isTrain=False)
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = SelfAttention(opt, device).to(device)
+    model = Transformer(opt, device).to(device)
     # Load checkpoint
     model.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{method}.cpt")))
     # Freeze model

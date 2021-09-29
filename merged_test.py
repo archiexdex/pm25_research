@@ -36,16 +36,16 @@ for sitename in SITENAMES:
         continue
     print(sitename)
     # In here, only use for get the ratio
-    train_dataset = PMSADataset(sitename=sitename, opt=opt, isTrain=True)
+    train_dataset = PMDataset(sitename=sitename, opt=opt, isTrain=True)
 
-    dataset    = PMSADataset(sitename=sitename, opt=opt, isTrain=False)
+    dataset    = PMDataset(sitename=sitename, opt=opt, isTrain=False)
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
     assert opt.nor_load_model != None, f"Merged method should determine the load model"
     assert opt.ext_load_model != None, f"Merged method should determine the load model"
-    nor_load_path = os.path.join(opt.cpt_dir, str(opt.nor_load_model), f"{sitename}_sa.cpt")
-    ext_load_path = os.path.join(opt.cpt_dir, str(opt.ext_load_model), f"{sitename}_sa.cpt")
+    nor_load_path = os.path.join(opt.cpt_dir, str(opt.nor_load_model), f"{sitename}_{opt.model}.cpt")
+    ext_load_path = os.path.join(opt.cpt_dir, str(opt.ext_load_model), f"{sitename}_{opt.model}.cpt")
     nor_model = load_model(nor_load_path, opt, device)
     ext_model = load_model(ext_load_path, opt, device)
     
