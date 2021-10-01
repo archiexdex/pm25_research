@@ -6,7 +6,7 @@ from argparse import Namespace
 import json
 import torch
 from torch import nn
-from sklearn.metrics import f1_score, precision_score, recall_score 
+from sklearn.metrics import f1_score, precision_score, recall_score, matthews_corrcoef
 from networks import *
 from tqdm import tqdm
 import csv
@@ -91,13 +91,14 @@ def save_config(config):
         json.dump(_config, fp, ensure_ascii=False, indent=4)
 
 def get_score(y_true, y_pred):
-    precision = precision_score(y_true, y_pred, zero_division=0)
-    recall    = recall_score   (y_true, y_pred, zero_division=0)
-    f1        = f1_score       (y_true, y_pred, zero_division=0)
-    macro     = f1_score       (y_true, y_pred, zero_division=0, average='macro')
-    micro     = f1_score       (y_true, y_pred, zero_division=0, average='micro')
-    weighted  = f1_score       (y_true, y_pred, zero_division=0, average='weighted')
-    return precision, recall, f1, macro, micro, weighted
+    precision = precision_score  (y_true, y_pred, zero_division=0)
+    recall    = recall_score     (y_true, y_pred, zero_division=0)
+    f1        = f1_score         (y_true, y_pred, zero_division=0)
+    macro     = f1_score         (y_true, y_pred, zero_division=0, average='macro')
+    micro     = f1_score         (y_true, y_pred, zero_division=0, average='micro')
+    weighted  = f1_score         (y_true, y_pred, zero_division=0, average='weighted')
+    mcc       = matthews_corrcoef(y_true, y_pred)
+    return precision, recall, f1, macro, micro, weighted, mcc
 
 def load_model(path, opt):
     checkpoint = torch.load(path)

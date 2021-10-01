@@ -378,7 +378,7 @@ class Fudan(nn.Module):
         return output, indicator_output, window_indicator 
 
 class MultiHeadAttentionLayer(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
         self.hid_dim = opt.hid_dim
@@ -395,7 +395,7 @@ class MultiHeadAttentionLayer(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-        self.scale = torch.sqrt(torch.FloatTensor([self.head_dim])).to(device)
+        self.scale = torch.sqrt(torch.FloatTensor([self.head_dim])).to(opt.device)
 
     def forward(self, query, key, value):
         #query = [batch size, query len, hid dim]
@@ -459,7 +459,7 @@ class PositionwiseFeedforwardLayer(nn.Module):
         return x
 
 class EncoderLayer(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
         hid_dim = opt.hid_dim
@@ -469,7 +469,7 @@ class EncoderLayer(nn.Module):
 
         self.self_attn_layer_norm     = nn.LayerNorm(hid_dim)
         self.ff_layer_norm            = nn.LayerNorm(hid_dim)
-        self.self_attention           = MultiHeadAttentionLayer(opt, device)
+        self.self_attention           = MultiHeadAttentionLayer(opt)
         self.positionwise_feedforward = PositionwiseFeedforwardLayer(opt)
         self.dropout                  = nn.Dropout(dropout)
 
@@ -492,7 +492,7 @@ class EncoderLayer(nn.Module):
 
         return src
 class DecoderLayer(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
         hid_dim = opt.hid_dim
@@ -503,8 +503,8 @@ class DecoderLayer(nn.Module):
         self.self_attn_layer_norm     = nn.LayerNorm(hid_dim)
         self.enc_attn_layer_norm      = nn.LayerNorm(hid_dim)
         self.ff_layer_norm            = nn.LayerNorm(hid_dim)
-        self.self_attention           = MultiHeadAttentionLayer(opt, device)
-        self.encoder_attention        = MultiHeadAttentionLayer(opt, device)
+        self.self_attention           = MultiHeadAttentionLayer(opt)
+        self.encoder_attention        = MultiHeadAttentionLayer(opt)
         self.positionwise_feedforward = PositionwiseFeedforwardLayer(opt)
         self.dropout                  = nn.Dropout(dropout)
 
@@ -539,7 +539,7 @@ class DecoderLayer(nn.Module):
         return trg, attention
 
 class SAEncoder(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
         input_dim = opt.input_dim 
@@ -548,19 +548,17 @@ class SAEncoder(nn.Module):
         n_heads   = opt.n_heads   
         pf_dim    = opt.pf_dim    
         dropout   = opt.dropout   
-
-        self.device = device
         
         self.tok_embedding = nn.Linear(input_dim,  hid_dim)
         self.feature_embedding = nn.Linear(8,  hid_dim)
         self.weather_embedding = nn.Linear(input_dim-8,  hid_dim)
         self.pos_embedding = nn.Linear(1, hid_dim)
         
-        self.layers = nn.ModuleList([EncoderLayer(opt, device) 
+        self.layers = nn.ModuleList([EncoderLayer(opt) 
                                      for _ in range(n_layers)])
         self.dropout = nn.Dropout(dropout)
         
-        self.scale = torch.sqrt(torch.FloatTensor([hid_dim])).to(device)
+        self.scale = torch.sqrt(torch.FloatTensor([hid_dim])).to(opt.device)
         
     def forward(self, src):
         #src = [batch size, src len, 16]
@@ -568,7 +566,7 @@ class SAEncoder(nn.Module):
         batch_size = src.shape[0]
         src_len    = src.shape[1]
         
-        pos = torch.arange(start=0, end=src_len, dtype=torch.float32, requires_grad=True).reshape(1, src_len, 1).repeat(batch_size, 1, 1).to(self.device)
+        #pos = torch.arange(start=0, end=src_len, dtype=torch.float32, requires_grad=True).reshape(1, src_len, 1).repeat(batch_size, 1, 1).to(self.device)
         #pos = [batch size, src len, 1]
         
         #src = self.dropout((self.tok_embedding(src) * self.scale) + self.pos_embedding(pos))
@@ -587,7 +585,7 @@ class SAEncoder(nn.Module):
         return src
 
 class SADecoder(nn.Module):
-    def __init__(self, opt, device, max_length=12):
+    def __init__(self, opt, max_length=12):
         super().__init__()
 
         input_dim  = opt.input_dim
@@ -598,13 +596,12 @@ class SADecoder(nn.Module):
         pf_dim     = opt.pf_dim
         dropout    = opt.dropout  
         
-        self.device = device
-        self.scale = torch.sqrt(torch.FloatTensor([hid_dim])).to(device)
+        self.scale = torch.sqrt(torch.FloatTensor([hid_dim])).to(opt.device)
 
         self.tok_embedding = nn.Linear(input_dim, hid_dim)
         self.pos_embedding = nn.Linear(max_length, hid_dim)
 
-        self.layers  = nn.ModuleList([DecoderLayer(opt, device) 
+        self.layers  = nn.ModuleList([DecoderLayer(opt) 
                                       for _ in range(n_layers)])
         self.fc_out  = nn.Linear(hid_dim, output_dim)
         self.dropout = nn.Dropout(dropout)
@@ -634,10 +631,10 @@ class SADecoder(nn.Module):
         return output, trg, attention
     
 class Transformer(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
-        self.encoder = SAEncoder(opt, device)
-        self.decoder = SADecoder(opt, device)
+        self.encoder = SAEncoder(opt)
+        self.decoder = SADecoder(opt)
 
     def forward(self, src, trg):
         #src = [batch size, src len, 16]

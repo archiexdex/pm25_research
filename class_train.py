@@ -58,7 +58,7 @@ for sitename in SITENAMES:
         valid_loss = class_test (opt, valid_dataloader, model)
         if best_loss > valid_loss:
             best_loss = valid_loss
-            torch.save(model.state_dict(), os.path.join(opt.cpt_dir, f"{sitename}_{opt.method}.cpt"))
+            torch.save(model.state_dict(), os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_{opt.method}.cpt"))
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")
 
