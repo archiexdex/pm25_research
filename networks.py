@@ -27,7 +27,7 @@ class RNN(nn.Module):
         self.leakyrelu = nn.LeakyReLU()
         self.sigmoid   = nn.Sigmoid()
     
-    def forward(self, x, past_window):
+    def forward(self, past_window, x):
         source_size = x.shape[1]
 
         x = torch.cat((past_window, x), dim=1)
@@ -38,7 +38,7 @@ class RNN(nn.Module):
         flt = self.dropout(flt)
         out = self.sigmoid(self.dense_out(flt))
         out = out.view(-1, source_size, 1)
-        return emb, hid, flt, out
+        return emb, hid, out
 
 class DNN(nn.Module):
     def __init__(self, opt):
@@ -59,7 +59,7 @@ class DNN(nn.Module):
         self.leakyrelu  = nn.LeakyReLU()
         self.sigmoid    = nn.Sigmoid()
     
-    def forward(self, x, past_window):
+    def forward(self, past_window, x):
         source_size = x.shape[1]
 
         x = torch.cat((past_window, x), dim=1)
@@ -69,7 +69,7 @@ class DNN(nn.Module):
         flt = self.dropout(flt)
         out = self.sigmoid(self.dense_out(flt))
         out = out.view(-1, source_size, 1)
-        return emb, hid, flt, out
+        return emb, hid, out
 
 class DNN_merged(nn.Module):
     def __init__(self, opt, nor_model, ext_model):
@@ -190,25 +190,26 @@ class Decoder(nn.Module):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
-        input_dim  = opt.input_dim
-        embed_dim  = opt.embed_dim
-        hid_dim    = opt.hid_dim
-        dropout    = opt.dropout
-        bidirectional = opt.bidirectional
+        # Parameters
+        input_dim        = opt.input_dim
+        embed_dim        = opt.embed_dim
+        hid_dim          = opt.hid_dim
+        dropout          = opt.dropout
+        bidirectional    = opt.bidirectional
         self.output_dim  = opt.output_dim
-        self.target_size = opt.target_size
-        self.device      = device
+        self.source_size = opt.source_size
+        self.device      = opt.device
         # Model
         self.encoder = Encoder(input_dim, embed_dim, self.output_dim, hid_dim, dropout, bidirectional)
         attention    = Attention(hid_dim, bidirectional)
         self.decoder = Decoder(input_dim, embed_dim, self.output_dim, hid_dim, attention, dropout, bidirectional)
 
-    def forward(self, xs, past_window, teacher_force_ratio=0.6):
+    def forward(self, past_window, xs, teacher_force_ratio=0.6):
         batch_size  = xs.shape[0]
-        trg_size    = self.target_size
+        trg_size    = self.source_size
         output_size = self.output_dim
         # Tensor to store decoder outputs
         outputs     = torch.zeros(batch_size, trg_size, output_size).to(self.device)
@@ -637,8 +638,8 @@ class Transformer(nn.Module):
         self.decoder = SADecoder(opt)
 
     def forward(self, src, trg):
-        #src = [batch size, src len, 16]
-        #trg = [batch size, trg len, 1]
+        #src = [batch size, src len, 17]
+        #trg = [batch size, trg len, 17]
 
         enc_src = self.encoder(src)
         #enc_src = [batch size, src len, hid dim]
@@ -650,24 +651,30 @@ class Transformer(nn.Module):
 
         return output, hidden, attention
 
-class Merged_Transformer(nn.Module):
+class Merged_Model(nn.Module):
     def __init__(self, opt, nor_model, ext_model):
         super().__init__()
+        self.opt       = opt
         self.nor_model = nor_model
         self.ext_model = ext_model
-        self.fc_out  = nn.Linear(opt.hid_dim<<1, opt.output_dim)
-        self.dropout = nn.Dropout(opt.dropout)
+        self.hid_out   = nn.Linear(opt.hid_dim * (opt.memory_size + opt.source_size), opt.hid_dim * opt.source_size)
+        self.fc_out    = nn.Linear(opt.hid_dim<<1, opt.output_dim)
+        self.dropout   = nn.Dropout(opt.dropout)
 
     def forward(self, src, trg):
-        #src = [batch size, src len, 16]
-        #trg = [batch size, trg len, 1]
+        #src = [batch size, src len, 17] past_data
+        #trg = [batch size, trg len, 17] x
 
-        nor_output, nor_hidden, nor_attention = self.nor_model(src, trg)
-        ext_output, ext_hidden, ext_attention = self.ext_model(src, trg)
-        #output = [batch size, trg len, output dim]
+        _, nor_hidden, _ = self.nor_model(src, trg)
+        _, ext_hidden, _ = self.ext_model(src, trg)
+        if nor_hidden.shape[1] != self.opt.source_size:
+            nor_hidden = torch.flatten(nor_hidden, 1)
+            nor_hidden = self.hid_out(nor_hidden).view(-1, self.opt.source_size, self.opt.hid_dim)
+        if ext_hidden.shape[1] != self.opt.source_size:
+            ext_hidden = torch.flatten(ext_hidden, 1)
+            ext_hidden = self.hid_out(ext_hidden).view(-1, self.opt.source_size, self.opt.hid_dim)
         #hidden = [batch size, trg len, hid dim]
-        #attention = [batch size, n heads, trg len, src len]
         hidden = torch.cat((nor_hidden, ext_hidden), dim=-1)
         output = self.fc_out(hidden)
 
-        return output, hidden, ext_attention
+        return output

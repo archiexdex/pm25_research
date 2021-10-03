@@ -49,8 +49,8 @@ for sitename in SITENAMES:
     nor_model = load_model(nor_load_path, opt)
     ext_model = load_model(ext_load_path, opt)
     # Load merged model 
-    model = Merged_Transformer(opt, nor_model, ext_model)
-    load_path = os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_merged_transformer.cpt")
+    model = Merged_Model(opt, nor_model, ext_model)
+    load_path = os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_{opt.model}.cpt")
     model.load_state_dict(torch.load(load_path))
     model.to(opt.device)
     # Freeze model
@@ -65,7 +65,7 @@ for sitename in SITENAMES:
         # get data
         x, y_true, ext_true, past_data  = map(lambda z: z.to(device), data)
         # get prediction 
-        ext_pred, _, _ = model(past_data, x)
+        ext_pred = model(past_data, x)
         # Recover predict
         ext_pred[ext_pred>=0.5] = 1
         ext_pred[ext_pred<0.5]  = 0

@@ -12,8 +12,7 @@ from model import *
 import csv
 
 opt = parse()
-opt.method = 'merged_transformer'
-opt.model = "transformer"
+opt.method = 'merged'
 same_seeds(opt.seed)
 
 device = get_device()
@@ -48,13 +47,13 @@ for sitename in SITENAMES:
     assert opt.ext_load_model != None, f"Merged method should determine the load model"
     nor_load_path = os.path.join(opt.cpt_dir, str(opt.nor_load_model), f"{sitename}_{opt.model}.cpt")
     ext_load_path = os.path.join(opt.cpt_dir, str(opt.ext_load_model), f"{sitename}_{opt.model}.cpt")
-    nor_model = load_model(nor_load_path, opt, device)
-    ext_model = load_model(ext_load_path, opt, device)
+    nor_model = load_model(nor_load_path, opt)
+    ext_model = load_model(ext_load_path, opt)
     for p in nor_model.parameters():
         p.requires_grad = False
     for p in ext_model.parameters():
         p.requires_grad = False
-    model = Merged_Transformer(opt, nor_model, ext_model).to(device)
+    model = Merged_Model(opt, nor_model, ext_model).to(device)
     # Optimizer
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=opt.lr)
     # Parameters
@@ -65,11 +64,11 @@ for sitename in SITENAMES:
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = tf_train(opt, train_dataloader, model, optimizer, device)
-        valid_loss = tf_test (opt, valid_dataloader, model, device)
+        train_loss = merged_train(opt, train_dataloader, model, optimizer)
+        valid_loss = merged_test (opt, valid_dataloader, model)
         if best_loss > valid_loss:
             best_loss = valid_loss
-            torch.save(model.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}.cpt"))
+            torch.save(model.state_dict(), os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_{opt.model}.cpt"))
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")
 
