@@ -14,50 +14,30 @@ import csv
 opt = parse()
 opt.model = 'fudan'
 opt.method = 'fudan'
+assert opt.model != None, "You must assign --model"
 same_seeds(opt.seed)
 
-if opt.no is not None:
-    no = opt.no
-else:
-    print("n is not a number")
-    exit()
+device = get_device()
+opt.device = device
 
-try:
-    cfg_dir = os.makedirs(os.path.join(opt.cfg_dir), 0o777)
-except:
-    pass
-cpt_dir = os.path.join(opt.cpt_dir, str(no))
-log_dir = os.path.join(opt.log_dir, str(no))
-if (not opt.yes) and os.path.exists(cpt_dir):
-    res = input(f"no: {no} exists, are you sure continue training? It will override all files.[y:N]")
-    res = res.lower()
-    if res not in ["y", "yes"]:
-        print("Stop training")
-        exit()
-    print("Override all files.")
-if os.path.exists(cpt_dir):
-    shutil.rmtree(cpt_dir)
-if os.path.exists(log_dir):
-    shutil.rmtree(log_dir)
-os.makedirs(cpt_dir, 0o777)
-os.makedirs(log_dir, 0o777)
+check_train_id(opt)
+build_dirs(opt)
 save_config(opt)
 
-device = get_device()
 st_t = datetime.now()
-train_records = {}
 for sitename in SITENAMES:
     if opt.skip_site == 1 and sitename not in SAMPLE_SITES:
         continue
     print(sitename)
-    
     # Dataset
     train_dataset = PMFudanDataset(sitename=sitename, opt=opt, isTrain=True)
     valid_dataset = PMFudanDataset(sitename=sitename, opt=opt, isTrain=False)
-
+    # Get ratio
+    opt.ratio = train_dataset.get_ratio()
+    print(f"Extreme Event: {1-opt.ratio:.3%}, Normal Event: {opt.ratio:.3%}")
+    # DataLoader
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
-    
     # Model
     model = Fudan(opt).to(device)
     # Optimizer
@@ -65,18 +45,16 @@ for sitename in SITENAMES:
     # Parameters
     total_epoch = opt.total_epoch
     patience = opt.patience
-    best_rmse = 1e9
     best_pred = 1e9
     earlystop_counter = 0
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_rmse, train_pred = fudan_train(opt, train_dataloader, model, optimizer, device)
-        valid_rmse, valid_pred = fudan_test (opt, valid_dataloader, model, device)
+        _, train_pred = fudan_train(opt, train_dataloader, model, optimizer)
+        _, valid_pred = fudan_test (opt, valid_dataloader, model)
         if best_pred > valid_pred:
-            best_rmse = valid_rmse
             best_pred = valid_pred
-            torch.save(model.state_dict(), os.path.join(cpt_dir, f"{sitename}_{opt.method}.cpt"))
+            torch.save(model.state_dict(), os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_{opt.model}.cpt"))
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")
 
@@ -86,14 +64,5 @@ for sitename in SITENAMES:
             if patience > 0 and earlystop_counter >= patience:
                 print("Early stop!!!")
                 break
-    print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_rmse: .4f}")
-    #train_records[sitename] = {
-    #    "mode": opt.method,
-    #    "best_rmse": f"{best_rmse:.3f}", 
-    #    "epoch": epoch, 
-    #    "timestamp": datetime.now() - st_time
-    #}
-# Write Record
-#write_record(f"{opt.log_dir}/{no}_{opt.method}.csv", train_records)
-
+    print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_pred: .4f}")
 print(f"Finish training no: {no}, cost time: {datetime.now() - st_t}!!!")

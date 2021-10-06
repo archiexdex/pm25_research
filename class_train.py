@@ -25,23 +25,19 @@ build_dirs(opt)
 save_config(opt)
 
 st_t = datetime.now()
-train_records = {}
 for sitename in SITENAMES:
     if opt.skip_site == 1 and sitename not in SAMPLE_SITES:
         continue
     print(sitename)
-    
     # Dataset
     train_dataset = PMDataset(sitename=sitename, opt=opt, isTrain=True)
     valid_dataset = PMDataset(sitename=sitename, opt=opt, isTrain=False)
-
     # Get ratio
     opt.ratio = train_dataset.get_ratio()
     print(f"Extreme Event: {1-opt.ratio:.3%}, Normal Event: {opt.ratio:.3%}")
-
+    # DataLoader
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
-    
     # Model
     model = get_model(opt).to(device)
     # Optimizer
@@ -69,5 +65,4 @@ for sitename in SITENAMES:
                 print("Early stop!!!")
                 break
     print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss: .4f}")
-
 print(f"Finish training no: {opt.no}, cost time: {datetime.now() - st_t}!!!")

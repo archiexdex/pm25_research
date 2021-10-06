@@ -71,38 +71,6 @@ class DNN(nn.Module):
         out = out.view(-1, source_size, 1)
         return emb, hid, out
 
-class DNN_merged(nn.Module):
-    def __init__(self, opt, nor_model, ext_model):
-        super().__init__()
-        # Parse paras
-        input_dim=opt.input_dim
-        hid_dim = opt.hid_dim
-        output_dim=opt.output_dim
-        source_size=opt.source_size
-        num_layers=opt.num_layers
-        self.target_size=opt.target_size
-        # 
-        self.nor_model = nor_model
-        self.ext_model = ext_model
-        self.dense_nor = nn.Linear(hid_dim*source_size, hid_dim)
-        self.dense_ext = nn.Linear(hid_dim*source_size, hid_dim)
-       # self.dense_nor = nn.Linear(hid_dim*source_size*num_layers, hid_dim)
-        #self.dense_ext = nn.Linear(hid_dim*source_size*num_layers, hid_dim)
-        self.dense_out = nn.Linear(hid_dim*2, output_dim*self.target_size)
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-        source_size = x.shape[1]
-        nor_emb, nor_hid, nor_flt, nor_out = self.nor_model(x)
-        ext_emb, ext_hid, ext_flt, ext_out = self.ext_model(x)
-        
-        nor_flt = self.relu(self.dense_nor(nor_flt))
-        ext_flt = self.relu(self.dense_ext(ext_flt))
-        merged_flt = torch.cat((nor_flt, ext_flt), -1)
-        out = self.relu(self.dense_out(merged_flt))
-        out = out.view(-1, self.target_size, 1)
-        return out
-
 class Encoder(nn.Module):
     def __init__(self, input_dim, embed_dim, output_dim, hid_dim, dropout=0.6, bidirectional=True):
         super().__init__()
@@ -224,24 +192,24 @@ class Seq2Seq(nn.Module):
             outputs    [:, i] = output
             predictions[:, i] = prediction
             # teacher force
-            #teacher_force = random.random() < teacher_force_ratio
+            # teacher_force = random.random() < teacher_force_ratio
             x = xs[:, i] # if teacher_force else output
         
         return outputs, predictions 
 
 class Fudan_Encoder(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
         # Parse paras
-        input_dim     = opt.input_dim
-        embed_dim     = opt.embed_dim 
-        hid_dim       = opt.hid_dim 
-        dropout       = opt.dropout
-        self.bidirectional = False
+        input_dim          = opt.input_dim
+        embed_dim          = opt.embed_dim 
+        hid_dim            = opt.hid_dim 
+        dropout            = opt.dropout
+        self.bidirectional = opt.bidirectional 
 
-        self.emb = nn.Linear(input_dim, embed_dim)
-        self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
+        self.emb     = nn.Linear(input_dim, embed_dim)
+        self.rnn     = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, mode):
@@ -250,7 +218,7 @@ class Fudan_Encoder(nn.Module):
             history_window = [None] * x.shape[1]
             for i in range(x.shape[1]):
                 embed = self.emb(x[:, i])
-                #embed = self.dropout(embed)
+                embed = self.dropout(embed)
                 _, hidden = self.rnn(embed)
                 hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
                 hidden = hidden.unsqueeze(1)
@@ -266,15 +234,15 @@ class Fudan_Encoder(nn.Module):
             return latent, hidden
 
 class Fudan_History(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
         # Parse paras
-        input_dim     = opt.input_dim
-        embed_dim     = opt.embed_dim 
-        hid_dim       = opt.hid_dim 
-        dropout       = opt.dropout
-        output_dim    = opt.output_dim
+        input_dim      = opt.input_dim
+        embed_dim      = opt.embed_dim 
+        hid_dim        = opt.hid_dim 
+        dropout        = opt.dropout
+        output_dim     = opt.output_dim
         self.hidden_fc = nn.Linear(hid_dim, output_dim)
 
     def forward(self, history_window):
@@ -283,7 +251,7 @@ class Fudan_History(nn.Module):
         return window_indicator
 
 class Fudan_Decoder(nn.Module):
-    def __init__(self, opt, device):
+    def __init__(self, opt):
         super().__init__()
 
         # Parse paras
@@ -304,7 +272,6 @@ class Fudan_Decoder(nn.Module):
         self.out_fc = nn.Linear(hid_dim, 1)
         self.bias_fc = nn.Linear(1, 1)
         self.softmax = nn.Softmax(dim=1)
-        self.device = device
 
     def forward(self, latent, hidden, history_window, past_ext):
         # hidden: [batch, 1, hid_dim]

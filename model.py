@@ -86,15 +86,15 @@ def fudan_train(opt, dataloader, model, optimizer):
     mean_rmse_loss = 0
     trange = tqdm(dataloader)
     mseLoss   = nn.MSELoss().to(opt.device)
-    fudanLoss = FudanLoss() .to(opt.device)
+    fudanLoss = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, thres_y, past_window, past_ext = map(lambda z: z.to(opt.device), data)
-        
+        # forward
         y_pred, ext_pred, past_pred = model(x, past_window, past_ext)
 
         # Calculate loss
-        mse_loss = mseLoss(y_pred, y_true)
+        mse_loss = mseLoss  (y_pred, y_true)
         ext_loss = fudanLoss(ext_pred, ext_true)
         his_loss = fudanLoss(past_pred, past_ext)
         loss = mse_loss + ext_loss + his_loss
@@ -119,19 +119,18 @@ def fudan_test(opt, dataloader, model):
     mean_pred_loss = 0
     mean_rmse_loss = 0
     trange = tqdm(dataloader)
-    mseLoss = nn.MSELoss().to(opt.device)
-    fudanLoss = FudanLoss() .to(opt.device)
+    mseLoss   = nn.MSELoss().to(opt.device)
+    fudanLoss = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, thres_y, past_window, past_ext = map(lambda z: z.to(opt.device), data)
-        
+        # forward
         y_pred, ext_pred, past_pred = model(x, past_window, past_ext)
-
         # Calculate loss
         mse_loss = mseLoss(y_pred, y_true)
         ext_loss = fudanLoss(ext_pred, ext_true)
         his_loss = fudanLoss(past_pred, past_ext)
-
+        
         rmse_loss  = torch.sqrt(mseLoss(y_pred * thres_y, y_true * thres_y)) 
         mean_rmse_loss += rmse_loss.item()
         mean_pred_loss += ext_loss.item()
@@ -204,7 +203,7 @@ def tf_train(opt, dataloader, model, optimizer):
     if opt.loss == "bce":
         loss_fn = nn.BCEWithLogitsLoss().to(opt.device)
     elif opt.loss == "evl":
-        loss_fn = EVLoss(alpha=opt.ratio, gamma=1).to(opt.device)
+        loss_fn = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, past_data = map(lambda z: z.to(opt.device), data)
@@ -231,7 +230,7 @@ def tf_test(opt, dataloader, model):
     if opt.loss == "bce":
         loss_fn = nn.BCEWithLogitsLoss().to(opt.device)
     elif opt.loss == "evl":
-        loss_fn = EVLoss(alpha=opt.ratio, gamma=1).to(opt.device)
+        loss_fn = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, past_data = map(lambda z: z.to(opt.device), data)
@@ -252,7 +251,7 @@ def merged_train(opt, dataloader, model, optimizer):
     if opt.loss == "bce":
         loss_fn = nn.BCEWithLogitsLoss().to(opt.device)
     elif opt.loss == "evl":
-        loss_fn = EVLoss(alpha=opt.ratio, gamma=1).to(opt.device)
+        loss_fn = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, past_data = map(lambda z: z.to(opt.device), data)
@@ -279,7 +278,7 @@ def merged_test(opt, dataloader, model):
     if opt.loss == "bce":
         loss_fn = nn.BCEWithLogitsLoss().to(opt.device)
     elif opt.loss == "evl":
-        loss_fn = EVLoss(alpha=opt.ratio, gamma=1).to(opt.device)
+        loss_fn = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
     for idx, data in enumerate(trange):
         # get data
         x, y_true, ext_true, past_data = map(lambda z: z.to(opt.device), data)
