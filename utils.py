@@ -79,7 +79,7 @@ def parse(args=None):
     return config
 
 def update_config(config):
-    if config.is_concat_label:
+    if not config.no_concat_label:
         config.input_dim += 1
     return config
 
@@ -132,6 +132,7 @@ def read_file(sitename, opt, mode, isTrain):
     return data
 
 def get_mask(opt, data, thres_data):
+    mask = np.zeros((data.shape[0], 1))
     # Limit the maximum threshold to opt.threshold.
     # Sometimes, it only influence winter threshold 
     if opt.is_min_threshold:
@@ -140,10 +141,10 @@ def get_mask(opt, data, thres_data):
         thres_data[index, 7] = opt.threshold
     # Calculate slope for adding extreme data
     # TODO: - use moving average to calculate dif_data
-    dif_data = abs(data[1:, 7] - data[:-1, 7]) if opt.use_abs_delta else data[1:, 7] - data[:-1, 7]
-    index = np.argwhere(dif_data>=opt.delta)[:, 0] + 1
-    mask = np.zeros((data.shape[0], 1))
-    mask[index] = 1
+    if opt.use_delta:
+        dif_data = abs(data[1:, 7] - data[:-1, 7]) if opt.use_abs_delta else data[1:, 7] - data[:-1, 7]
+        index = np.argwhere(dif_data>=opt.delta)[:, 0] + 1
+        mask[index] = 1
     mask[data[:, 7]>=thres_data[:, 7]] = 1
     return mask
 

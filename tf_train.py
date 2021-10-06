@@ -43,7 +43,7 @@ for sitename in SITENAMES:
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     
     # Model
-    model = Transformer(opt, device).to(device)
+    model = Transformer(opt).to(device)
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     # Parameters
@@ -54,8 +54,8 @@ for sitename in SITENAMES:
     st_time = datetime.now()
     
     for epoch in range(total_epoch):
-        train_loss = tf_train(opt, train_dataloader, model, optimizer, device)
-        valid_loss = tf_test (opt, valid_dataloader, model, device)
+        train_loss = tf_train(opt, train_dataloader, model, optimizer)
+        valid_loss = tf_test (opt, valid_dataloader, model)
         if best_loss > valid_loss:
             best_loss = valid_loss
             torch.save(model.state_dict(), os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_{opt.model}.cpt"))
@@ -69,5 +69,4 @@ for sitename in SITENAMES:
                 print("Early stop!!!")
                 break
     print(f"sitename: {sitename}\nepoch: {epoch}\nbest_loss: {best_loss: .4f}")
-
 print(f"Finish training no: {no}, cost time: {datetime.now() - st_t}!!!")
