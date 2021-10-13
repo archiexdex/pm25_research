@@ -51,9 +51,9 @@ for sitename in SITENAMES:
         x, y_true, ext_true, past_data = map(lambda z: z.to(opt.device), data)
         # get loss & update
         if opt.model == "seq":
-            _, ext_pred = model(x, past_data)
+            _, ext_pred = model(past_data, x)
         else:
-            _, _, ext_pred = model(x, past_data)
+            _, _, ext_pred = model(past_data, x)
         # Recover predict
         ext_pred[ext_pred>=0.5] = 1
         ext_pred[ext_pred<0.5]  = 0

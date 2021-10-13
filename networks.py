@@ -459,6 +459,7 @@ class EncoderLayer(nn.Module):
         #src = [batch size, src len, hid dim]
 
         return src
+
 class DecoderLayer(nn.Module):
     def __init__(self, opt):
         super().__init__()

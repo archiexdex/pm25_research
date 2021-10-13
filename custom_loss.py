@@ -12,8 +12,8 @@ class EVLoss(nn.Module):
     
     def forward(self, x, y):
         x = nn.Sigmoid()(x)
-        pos = -1 * self.alpha     * torch.pow(1-x    /self.gamma, self.gamma) * y     * torch.log(x   + EPS)
-        neg = -1 * (1-self.alpha) * torch.pow(1-(1-x)/self.gamma, self.gamma) * (1-y) * torch.log(1-x + EPS)
+        pos = -1 * self.alpha     * torch.pow(1-x    /self.gamma + EPS, self.gamma) * y     * torch.log(x   + EPS)
+        neg = -1 * (1-self.alpha) * torch.pow(1-(1-x)/self.gamma + EPS, self.gamma) * (1-y) * torch.log(1-x + EPS)
         ret = torch.mean(pos + neg)
         return ret
 
