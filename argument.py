@@ -25,7 +25,7 @@ def add_arguments(parser):
     parser.add_argument('--source_size',     type=int,   default=24,   help='The size of current data period.')
     parser.add_argument('--target_size',     type=int,   default=8,    help='')
     parser.add_argument('--threshold',       type=int,   default=54,   help='')
-    parser.add_argument('--gamma',           type=float, default=1,    help='the parameter for extreme value loss')
+    parser.add_argument('--gamma',           type=float, default=3,    help='the parameter for extreme value loss')
     parser.add_argument('--shuffle',         type=int,   default=1,    help='')
     parser.add_argument('--is_transform',    type=int,   default=1,    help='')
     parser.add_argument('--use_ext',         action='store_true',      help='')
