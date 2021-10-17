@@ -6,11 +6,13 @@ from argparse import Namespace
 import json
 import torch
 from torch import nn
-from sklearn.metrics import f1_score, precision_score, recall_score, matthews_corrcoef
+from torch.utils.data import DataLoader
+from model import *
 from networks import *
-from tqdm import tqdm
+from custom_loss import *
 import csv
-torch.autograd.set_detect_anomaly(True)
+from sklearn.metrics import f1_score, precision_score, recall_score, matthews_corrcoef
+#torch.autograd.set_detect_anomaly(True)
 
 def get_device():
     return "cuda" if torch.cuda.is_available() else "cpu"
@@ -64,6 +66,9 @@ def same_seeds(seed):
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
+#################################
+########## config ###############
+#################################
 def parse(args=None):
     parser = argparse.ArgumentParser()
     try: 
@@ -90,6 +95,9 @@ def save_config(config):
     with open(os.path.join(config.cfg_dir, f"{no}.json"), "w") as fp:
         json.dump(_config, fp, ensure_ascii=False, indent=4)
 
+#################################
+########## matrix ###############
+#################################
 def get_score(y_true, y_pred):
     precision = precision_score  (y_true, y_pred, zero_division=0)
     recall    = recall_score     (y_true, y_pred, zero_division=0)
@@ -100,6 +108,9 @@ def get_score(y_true, y_pred):
     mcc       = matthews_corrcoef(y_true, y_pred)
     return precision, recall, f1, macro, micro, weighted, mcc
 
+#################################
+########## model ################
+#################################
 def load_model(path, opt):
     checkpoint = torch.load(path)
     model = get_model(opt)
@@ -119,6 +130,32 @@ def get_model(opt):
     elif name == "transformer":
         model = Transformer(opt)
     return model
+
+def get_loss(opt):
+    if opt.loss == "bce":
+        loss_fn = nn.BCEWithLogitsLoss().to(opt.device)
+    elif opt.loss == "evl":
+        loss_fn = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
+    return loss_fn
+
+def get_trainer(opt):
+    if opt.method == "fudan":
+        trainer = fudan_trainer
+    elif opt.method == "class":
+        trainer = class_trainer
+    elif opt.method == "transformer":
+        trainer = tf_trainer
+    return trainer
+
+#################################
+########## dataset ##############
+#################################
+def get_dataset(opt, sitename, isTrain):
+    from dataset import PMDataset, PMFudanDataset
+    if opt.method == "fudan":
+        return PMFudanDataset(sitename=sitename, opt=opt, isTrain=isTrain)
+    else:
+        return PMDataset(sitename=sitename, opt=opt, isTrain=isTrain)
 
 def read_file(sitename, opt, mode, isTrain):
     if mode == 0:
