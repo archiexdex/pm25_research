@@ -26,12 +26,11 @@ def read_csv(dataset):
     if dataset == "train":
         st, ed = 0, -1
     elif dataset == "valid":
-        st, ed = -1, len(dataset_files)
+        st, ed = -1, len(DATASET_FILES)
     elif dataset == "all":
-        st, ed = 0, len(dataset_files)
+        st, ed = 0, len(DATASET_FILES)
     data_dict = None
-    #trange = tqdm(dataset_files[st:ed])
-    for d in dataset_files[st:ed]:
+    for d in DATASET_FILES[st:ed]:
         read_path = os.path.join("data", d)
         print(read_path)
         data = pd.read_csv(read_path, index_col='Unnamed: 0')
@@ -47,7 +46,7 @@ def filter_data(data):
     # parse real time
     data['read_time'] = pd.to_datetime(data['read_time'])
     # Check whether the site in the sitenames_sorted list 
-    data = data[data.sn.isin(sitenames)]
+    data = data[data.sn.isin(SITENAMES)]
     # Sort data by read_time and sitename 
     data = data.sort_values(['read_time', 'sn'])
     # Reorder the data 
@@ -67,7 +66,7 @@ def filter_data(data):
     # Append time and extreme event buf into data_features
     data_features = np.concatenate((data_features, data_month, data_day, data_hour), axis=-1)
     # Fetch site and hash
-    sn_hash = dict(zip(sitenames, range(len(sitenames))))
+    sn_hash = dict(zip(SITENAMES, range(len(SITENAMES))))
     data_sn = np.zeros((data.shape[0], 1))
     for i, d in enumerate(data['sn']):
         data_sn[i] = sn_hash[d]
@@ -96,13 +95,13 @@ def get_normalize(data):
         _data = data[key].copy()
         thres_list = np.zeros((_data.shape[0], _data.shape[-1]))
         # summer
-        s_index = np.isin(_data[:, -3], summer_months)
+        s_index = np.isin(_data[:, -3], SUMMER_MONTHS)
         s_mean  = _data[s_index].mean(0)
         s_std   = _data[s_index].std(0)
         s_threshold = s_mean + s_std * ratio
         thres_list[s_index] = s_threshold
         # winter
-        w_index = np.isin(_data[:, -3], summer_months, invert=True)
+        w_index = np.isin(_data[:, -3], SUMMER_MONTHS, invert=True)
         w_mean  = _data[w_index].mean(0)
         w_std   = _data[w_index].std(0)
         w_threshold = w_mean + w_std * ratio
@@ -133,11 +132,11 @@ def put_normalize(data, mean_dict, std_dict, threshold_dict):
         mean = np.array(mean_dict[key])
         std = np.array(std_dict[key])
         # summer
-        s_index = np.isin(_data[:, -3], summer_months)
+        s_index = np.isin(_data[:, -3], SUMMER_MONTHS)
         s_threshold = threshold_dict[key]["summer"]
         thres_list[s_index] = s_threshold
         # winter
-        w_index = np.isin(_data[:, -3], summer_months, invert=True)
+        w_index = np.isin(_data[:, -3], SUMMER_MONTHS, invert=True)
         w_threshold = threshold_dict[key]["winter"]
         thres_list[w_index] = w_threshold
         # normalize
