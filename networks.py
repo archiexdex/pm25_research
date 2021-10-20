@@ -239,6 +239,7 @@ class Fudan(nn.Module):
             hidden = hidden.unsqueeze(1)
             windows[i] = hidden
         window_indicator = torch.cat([self.hidden_fc(window) for window in windows], 1)
+        window_indicator = torch.sigmoid(window_indicator)
         # window_indicator: [batch, memory_size, 1]
         alpha = [torch.bmm(x_hidden, window.reshape(-1, x_hidden.shape[-1], 1)) for window in windows]
         alpha = torch.cat(alpha, 1)
