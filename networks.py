@@ -25,7 +25,6 @@ class RNN(nn.Module):
         self.dropout   = nn.Dropout(dropout)
         self.relu      = nn.ReLU()
         self.leakyrelu = nn.LeakyReLU()
-        self.sigmoid   = nn.Sigmoid()
     
     def forward(self, past_window, x):
         source_size = x.shape[1]
@@ -36,7 +35,8 @@ class RNN(nn.Module):
         hid = self.leakyrelu(hid)
         flt = torch.flatten(hid, 1)
         flt = self.dropout(flt)
-        out = self.sigmoid(self.dense_out(flt))
+        out = self.dense_out(flt)
+        out = torch.sigmoid(out)
         out = out.view(-1, source_size, 1)
         return emb, hid, out
 
@@ -57,7 +57,6 @@ class DNN(nn.Module):
         self.dropout    = nn.Dropout()
         self.relu       = nn.ReLU()
         self.leakyrelu  = nn.LeakyReLU()
-        self.sigmoid    = nn.Sigmoid()
     
     def forward(self, past_window, x):
         source_size = x.shape[1]
@@ -67,7 +66,8 @@ class DNN(nn.Module):
         hid = self.leakyrelu(self.dense_hid(emb))
         flt = torch.flatten(hid, 1)
         flt = self.dropout(flt)
-        out = self.sigmoid(self.dense_out(flt))
+        out = self.dense_out(flt)
+        out = torch.sigmoid(out)
         out = out.view(-1, source_size, 1)
         return emb, hid, out
 
@@ -194,102 +194,10 @@ class Seq2Seq(nn.Module):
             # teacher force
             # teacher_force = random.random() < teacher_force_ratio
             x = xs[:, i] # if teacher_force else output
+        predictions = torch.sigmoid(predictions)
         
         return outputs, predictions 
 
-class Fudan_Encoder(nn.Module):
-    def __init__(self, opt):
-        super().__init__()
-
-        # Parse paras
-        input_dim          = opt.input_dim
-        embed_dim          = opt.embed_dim 
-        hid_dim            = opt.hid_dim 
-        dropout            = opt.dropout
-        self.bidirectional = opt.bidirectional 
-
-        self.emb     = nn.Linear(input_dim, embed_dim)
-        self.rnn     = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x, mode):
-        if mode == 0:
-            # past window
-            history_window = [None] * x.shape[1]
-            for i in range(x.shape[1]):
-                embed = self.emb(x[:, i])
-                embed = self.dropout(embed)
-                _, hidden = self.rnn(embed)
-                hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
-                hidden = hidden.unsqueeze(1)
-                # hidden: [batch, 1, hid_dim]
-                history_window[i] = hidden
-            return history_window
-        elif mode == 1:
-            # current data
-            embed = self.emb(x)
-            #embed = self.dropout(embed)
-            latent, hidden = self.rnn(embed)
-            hidden = hidden.reshape(-1, 1, hidden.shape[-1])
-            return latent, hidden
-
-class Fudan_History(nn.Module):
-    def __init__(self, opt):
-        super().__init__()
-
-        # Parse paras
-        input_dim      = opt.input_dim
-        embed_dim      = opt.embed_dim 
-        hid_dim        = opt.hid_dim 
-        dropout        = opt.dropout
-        output_dim     = opt.output_dim
-        self.hidden_fc = nn.Linear(hid_dim, output_dim)
-
-    def forward(self, history_window):
-        window_indicator = torch.cat([self.hidden_fc(window) for window in history_window], 1)
-        # window_indicator: [batch, memory_size, 1]
-        return window_indicator
-
-class Fudan_Decoder(nn.Module):
-    def __init__(self, opt):
-        super().__init__()
-
-        # Parse paras
-        input_dim     = opt.input_dim
-        embed_dim     = opt.embed_dim 
-        hid_dim       = opt.hid_dim 
-        source_size   = opt.source_size
-        dropout       = opt.dropout
-        num_layers    = opt.num_layers
-
-        self.memory_size   = opt.memory_size
-        self.output_dim    = opt.output_dim
-        self.bidirectional = False
-        #self.emb = nn.Linear(input_dim, embed_dim)
-        #self.rnn = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
-        self.dropout = nn.Dropout(dropout)
-        self.hidden_fc = nn.Linear(hid_dim, 1)
-        self.out_fc = nn.Linear(hid_dim, 1)
-        self.bias_fc = nn.Linear(1, 1)
-        self.softmax = nn.Softmax(dim=1)
-
-    def forward(self, latent, hidden, history_window, past_ext):
-        # hidden: [batch, 1, hid_dim]
-        # latten: [batch, source_size, hid_dim]
-        # attention with window
-        alpha = [torch.bmm(hidden, window.reshape(-1, hidden.shape[-1], 1)) for window in history_window]
-        alpha = torch.cat(alpha, 1)
-        alpha = self.softmax(alpha)
-        # alpha: [batch, window_len, 1]
-        indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
-        # indicator_output: [batch, 1, 1]
-        output = self.out_fc(latent)
-        bias = self.bias_fc(indicator_output)
-        output = output + bias
-        # indicator_output: [batch, 1, 1]
-        # output: [batch, 1, 1]
-        return output, indicator_output
-    
 class Fudan(nn.Module):
     def __init__(self, opt):
         super().__init__()
@@ -337,6 +245,7 @@ class Fudan(nn.Module):
         alpha = self.softmax(alpha)
         # alpha: [batch, memory_size, 1]
         indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
+        indicator_output = torch.sigmoid(indicator_output)
         # indicator_output: [batch, 1, 1]
         output = self.out_fc(x_latent)
         #output: [batch, source_size, 1]
@@ -616,6 +525,7 @@ class Transformer(nn.Module):
         #output = [batch size, trg len, output dim]
         #hidden = [batch size, trg len, hid dim]
         #attention = [batch size, n heads, trg len, src len]
+        output = torch.sigmoid(output)
 
         return output, hidden, attention
 
@@ -644,5 +554,6 @@ class Merged_Model(nn.Module):
         #hidden = [batch size, trg len, hid dim]
         hidden = torch.cat((nor_hidden, ext_hidden), dim=-1)
         output = self.fc_out(hidden)
+        output = torch.sigmoid(output)
 
         return output

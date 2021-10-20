@@ -65,6 +65,7 @@ def same_seeds(seed):
     random.seed(seed)  # Python random module.
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.enabled = False
 
 #################################
 ########## config ###############
@@ -133,7 +134,7 @@ def get_model(opt):
 
 def get_loss(opt):
     if opt.loss == "bce":
-        loss_fn = nn.BCEWithLogitsLoss().to(opt.device)
+        loss_fn = nn.BCELoss().to(opt.device)
     elif opt.loss == "evl":
         loss_fn = EVLoss(alpha=opt.ratio, gamma=opt.gamma).to(opt.device)
     return loss_fn

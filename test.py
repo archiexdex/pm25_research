@@ -31,7 +31,7 @@ for sitename in SITENAMES:
         continue
     print(sitename)
     # Dataset
-    dataset = get_dataset(opt=opt, sitename=sitename, isTrain=True)
+    dataset = get_dataset(opt=opt, sitename=sitename, isTrain=False)
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
     # Model
     model = get_model(opt)
@@ -79,10 +79,10 @@ for sitename in SITENAMES:
     precision, recall, f1, macro, micro, weighted, mcc = get_score(true_list[:, j], pred_list[:, j])
     results.append({
         'sitename': sitename,
-        'precision': f"{precision:.3f}",
-        'recall'   : f"{recall   :.3f}",
-        'f1'       : f"{f1       :.3f}",
-        'mcc'      : f"{mcc      :.3f}",
+        'precision': f"{precision:.4f}",
+        'recall'   : f"{recall   :.4f}",
+        'f1'       : f"{f1       :.4f}",
+        'mcc'      : f"{mcc      :.4f}",
     })
 df = pd.DataFrame(results) 
 df.to_csv(f"{rst_dir}/{no}.csv", index=False, encoding='utf_8_sig')
