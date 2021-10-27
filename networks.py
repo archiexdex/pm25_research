@@ -246,7 +246,6 @@ class Fudan(nn.Module):
         alpha = self.softmax(alpha)
         # alpha: [batch, memory_size, 1]
         indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
-        indicator_output = torch.sigmoid(indicator_output)
         # indicator_output: [batch, 1, 1]
         output = self.out_fc(x_latent)
         #output: [batch, source_size, 1]

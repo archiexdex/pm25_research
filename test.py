@@ -62,8 +62,8 @@ for sitename in SITENAMES:
         else:
             _, _, ext_pred = model(past_data, x)
         # Recover predict
-        ext_pred[ext_pred>=0.5] = 1
-        ext_pred[ext_pred<0.5]  = 0
+        ext_pred[ext_pred>0.5] = 1
+        ext_pred[ext_pred<0.5] = 0
         ext_pred = ext_pred.detach().cpu().numpy()
         ext_true = ext_true.detach().cpu().numpy()
         # Append result
