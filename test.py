@@ -8,7 +8,6 @@ from datetime import datetime
 from dataset import *
 import csv, json
 import pandas as pd
-from dotted.collection import DottedDict
 
 # Test
 opt = parse()
