@@ -427,10 +427,10 @@ class SAEncoder(nn.Module):
         pf_dim    = opt.pf_dim    
         dropout   = opt.dropout   
         
-        self.tok_embedding = nn.Linear(input_dim,  hid_dim)
+        #self.tok_embedding = nn.Linear(input_dim,  hid_dim)
         self.feature_embedding = nn.Linear(8,  hid_dim)
         self.weather_embedding = nn.Linear(input_dim-8,  hid_dim)
-        self.pos_embedding = nn.Linear(1, hid_dim)
+        #self.pos_embedding = nn.Linear(1, hid_dim)
         
         self.layers = nn.ModuleList([EncoderLayer(opt) 
                                      for _ in range(n_layers)])
@@ -452,8 +452,6 @@ class SAEncoder(nn.Module):
         feature_src = (self.feature_embedding(src[:, :, :8]) * self.scale)
         weather_src = (self.weather_embedding(src[:, :, 8:]) * self.scale)
         src = self.dropout(feature_src + weather_src)
-        #pos = self.pos_embedding(pos)
-        #src = self.dropout(src + pos)
         #src = [batch size, src len, hid dim]
         
         for layer in self.layers:
