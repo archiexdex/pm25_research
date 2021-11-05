@@ -173,17 +173,17 @@ def get_mask(opt, data, thres_data):
     mask = np.zeros((data.shape[0], 1))
     # Limit the maximum threshold to opt.threshold.
     # Sometimes, it only influence winter threshold 
-    if opt.is_min_threshold:
-        _tmp = thres_data[:, 7]
-        index = np.argwhere(_tmp>=opt.threshold)
-        thres_data[index, 7] = opt.threshold
+    if opt.use_threshold:
+        if opt.use_min_threshold:
+            index = np.argwhere(thres_data[:, 7] >= opt.threshold)
+            thres_data[index, 7] = opt.threshold
+        mask[data[:, 7]>=thres_data[:, 7]] = 1
     # Calculate slope for adding extreme data
     # TODO: - use moving average to calculate dif_data
     if opt.use_delta:
         dif_data = abs(data[1:, 7] - data[:-1, 7]) if opt.use_abs_delta else data[1:, 7] - data[:-1, 7]
         index = np.argwhere(dif_data>=opt.delta)[:, 0] + 1
         mask[index] = 1
-    mask[data[:, 7]>=thres_data[:, 7]] = 1
     return mask
 
 def get_split_dataset(opt, data):
