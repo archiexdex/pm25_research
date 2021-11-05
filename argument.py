@@ -45,8 +45,8 @@ def add_arguments(parser):
     parser.add_argument('--dropout',         type=float, default=0.6, help='')
     parser.add_argument('--bidirectional',   action='store_true',     help='')
     parser.add_argument('--n_heads',         type=int,   default=8,  help='')
-    parser.add_argument('--pf_dim',          type=int,   default=64,  help='')
-    parser.add_argument('--n_layers',        type=int,   default=3,  help='')
+    parser.add_argument('--pf_dim',          type=int,   default=32,  help='')
+    parser.add_argument('--n_layers',        type=int,   default=1,  help='')
     parser.add_argument('--clip',            type=int,   default=1,  help='')
 
     parser.add_argument('--origin_all_dir',         type=str,   default="data/origin/all",           help='')
