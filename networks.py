@@ -70,15 +70,10 @@ class DNN(nn.Module):
         return emb, hid, out
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, embed_dim, output_dim, hid_dim, dropout=0.6, bidirectional=True):
+    def __init__(self, input_dim, embed_dim, output_dim, hid_dim, num_layers=2, dropout=0.6, bidirectional=True):
         super().__init__()
         
         # Parse paras
-        input_dim          = input_dim
-        embed_dim          = embed_dim 
-        hid_dim            = hid_dim 
-        output_dim         = output_dim
-        dropout            = dropout
         self.bidirectional = bidirectional
 
         self.emb = nn.Linear(input_dim, embed_dim)
@@ -93,7 +88,7 @@ class Encoder(nn.Module):
         
         hidden = torch.cat((hidden[-2], hidden[-1]), dim=1) if self.bidirectional else hidden[-1]
         hidden = self.enc_fc(hidden)
-        #hidden = torch.tanh(hidden)
+        hidden = torch.tanh(hidden)
         
         # latent: [batch, src len, hid_dim * num direcions]
         # hidden: [batch, hid_dim]
@@ -109,10 +104,9 @@ class Attention(nn.Module):
     def forward(self, hidden, enc_out):
         src_len = enc_out.shape[1]
         hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
-        # TODO: use torch.cat or plus both
-        energy = self.att(torch.cat((enc_out, hidden), dim=-1))
+        energy = torch.tanh(self.att(torch.cat((enc_out, hidden), dim=-1)))
         a = self.v(energy).squeeze()
-        a = F.softmax(a, dim=-1)
+        a = torch.softmax(a, dim=-1)
         
         # a: [batch size, src len]
         return a
@@ -163,13 +157,14 @@ class Seq2Seq(nn.Module):
         input_dim        = opt.input_dim
         embed_dim        = opt.embed_dim
         hid_dim          = opt.hid_dim
+        num_layers       = opt.num_layers
         dropout          = opt.dropout
         bidirectional    = opt.bidirectional
         self.output_dim  = opt.output_dim
         self.source_size = opt.source_size
         self.device      = opt.device
         # Model
-        self.encoder = Encoder(input_dim, embed_dim, self.output_dim, hid_dim, dropout, bidirectional)
+        self.encoder = Encoder(input_dim, embed_dim, self.output_dim, hid_dim, num_layers, dropout, bidirectional)
         attention    = Attention(hid_dim, bidirectional)
         self.decoder = Decoder(input_dim, embed_dim, self.output_dim, hid_dim, attention, dropout, bidirectional)
 
@@ -204,19 +199,22 @@ class Fudan(nn.Module):
         embed_dim     = opt.embed_dim 
         hid_dim       = opt.hid_dim 
         source_size   = opt.source_size
+        num_layers    = opt.num_layers
         dropout       = opt.dropout
         num_layers    = opt.num_layers
+        output_dim    = opt.output_dim
 
-        self.memory_size   = opt.memory_size
-        self.output_dim    = opt.output_dim
-        self.bidirectional = False
+        self.bidirectional = opt.bidirectional 
+        self.device = opt.device
         
         self.emb       = nn.Linear(input_dim, embed_dim)
-        self.rnn       = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
+        self.rnn       = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=self.bidirectional) if num_layers > 1 \
+                    else nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
         self.dropout   = nn.Dropout(dropout)
-        self.hidden_fc = nn.Linear(hid_dim, 1)
-        self.out_fc    = nn.Linear(hid_dim, 1)
-        self.bias_fc   = nn.Linear(hid_dim, 1)
+        self.enc_fc    = nn.Linear(hid_dim * 2, hid_dim) if self.bidirectional else nn.Linear(hid_dim, hid_dim)
+        self.hidden_fc = nn.Linear(hid_dim, output_dim)
+        self.out_fc    = nn.Linear(hid_dim * 2, output_dim) if self.bidirectional else nn.Linear(hid_dim, output_dim)
+        self.bias_fc   = nn.Linear(hid_dim, output_dim)
         self.softmax   = nn.Softmax(dim=1)
 
     def forward(self, x, past_window, past_ext):
@@ -226,27 +224,27 @@ class Fudan(nn.Module):
         embed = self.emb(x)
         x_latent, x_hidden = self.rnn(embed)
         x_hidden = torch.cat((x_hidden[-1], x_hidden[-2]), dim=1) if self.bidirectional else x_hidden[-1]
+        x_hidden = self.enc_fc(x_hidden)
         x_hidden = x_hidden.unsqueeze(1)
         # latent: [batch, source_size, hid_dim]
         # hidden: [batch, 1, hid_dim]
-        windows = [None] * past_window.shape[1]
+        windows = torch.zeros(past_window.shape[0], past_window.shape[1], x_hidden.shape[-1]).to(self.device)
+        embed = self.emb(past_window)
         for i in range(past_window.shape[1]):
-            embed = self.emb(past_window[:, i])
-            _, hidden = self.rnn(embed)
+            _, hidden = self.rnn(embed[:, i])
             hidden = torch.cat((hidden[-1], hidden[-2]), dim=1) if self.bidirectional else hidden[-1]
-            hidden = hidden.unsqueeze(1)
-            windows[i] = hidden
-        window_indicator = torch.cat([self.hidden_fc(window) for window in windows], 1)
+            hidden = self.enc_fc(hidden)
+            windows[:, i] = hidden
+        window_indicator = self.hidden_fc(windows)
         window_indicator = torch.sigmoid(window_indicator)
-        # window_indicator: [batch, memory_size, 1]
-        alpha = [torch.bmm(x_hidden, window.reshape(-1, x_hidden.shape[-1], 1)) for window in windows]
-        alpha = torch.cat(alpha, 1)
+        # window_indicator: [batch, memory_size, output_dim]
+        alpha = torch.bmm(windows, x_hidden.reshape(-1, x_hidden.shape[2], x_hidden.shape[1]))
         alpha = self.softmax(alpha)
         # alpha: [batch, memory_size, 1]
         indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
         # indicator_output: [batch, 1, 1]
         output = self.out_fc(x_latent)
-        #output: [batch, source_size, 1]
+        #output: [batch, source_size, output_dim]
         x_hidden = x_hidden.repeat(1, output.shape[1], 1)
         bias   = self.bias_fc(x_hidden)
         output = output + bias
