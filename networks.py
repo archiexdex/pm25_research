@@ -9,8 +9,8 @@ class RNN(nn.Module):
         super().__init__()
         # Parse paras
         input_dim        = opt.input_dim
-        embed_dim        = opt.embed_dim 
-        hid_dim          = opt.hid_dim 
+        embed_dim        = opt.embed_dim >> 2
+        hid_dim          = opt.hid_dim   >> 2
         output_dim       = opt.output_dim
         source_size      = opt.source_size
         memory_size      = opt.memory_size
@@ -21,18 +21,17 @@ class RNN(nn.Module):
         # 
         self.dense_emb = nn.Linear(input_dim, embed_dim)
         self.dense_out = nn.Linear(2 * hid_dim * (memory_size + source_size), output_dim * source_size) if bidirectional else nn.Linear(hid_dim * (memory_size + source_size), output_dim * source_size)
-        self.rnn       = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional)
+        self.rnn       = nn.GRU(embed_dim, hid_dim, batch_first=True)
         self.dropout   = nn.Dropout(dropout)
-        self.relu      = nn.ReLU()
         self.leakyrelu = nn.LeakyReLU()
     
     def forward(self, past_window, x):
         source_size = x.shape[1]
 
         x = torch.cat((past_window, x), dim=1)
-        emb = self.leakyrelu(self.dense_emb(x))
+        emb = self.dropout(torch.tanh(self.dense_emb(x)))
         hid, _ = self.rnn(emb)
-        hid = self.leakyrelu(hid)
+        hid = torch.tanh(hid)
         flt = torch.flatten(hid, 1)
         flt = self.dropout(flt)
         out = self.dense_out(flt)
@@ -45,8 +44,8 @@ class DNN(nn.Module):
         super().__init__()
         # Parse paras
         input_dim   = opt.input_dim
-        embed_dim   = opt.embed_dim 
-        hid_dim     = opt.hid_dim
+        embed_dim   = opt.embed_dim >> 2
+        hid_dim     = opt.hid_dim   >> 2
         output_dim  = opt.output_dim
         source_size = opt.source_size
         memory_size = opt.memory_size
@@ -55,15 +54,14 @@ class DNN(nn.Module):
         self.dense_hid  = nn.Linear(embed_dim, hid_dim)
         self.dense_out  = nn.Linear(hid_dim * (memory_size + source_size), output_dim * source_size)
         self.dropout    = nn.Dropout()
-        self.relu       = nn.ReLU()
         self.leakyrelu  = nn.LeakyReLU()
     
     def forward(self, past_window, x):
         source_size = x.shape[1]
 
         x = torch.cat((past_window, x), dim=1)
-        emb = self.leakyrelu(self.dense_emb(x))
-        hid = self.leakyrelu(self.dense_hid(emb))
+        emb = self.dropout(torch.tanh(self.dense_emb(x)))
+        hid = self.dropout(torch.tanh(self.dense_hid(emb)))
         flt = torch.flatten(hid, 1)
         flt = self.dropout(flt)
         out = self.dense_out(flt)
