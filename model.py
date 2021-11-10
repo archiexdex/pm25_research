@@ -53,7 +53,7 @@ def class_trainer(opt, dataloader, model, loss_fn, optimizer=None):
         x, y_true, ext_true, past_data = map(lambda z: z.to(opt.device), data)
         # get loss & update
         if opt.model.lower() == "seq":
-            _, ext_pred = model(past_data, x) 
+            ext_pred = model(past_data, x) 
         else:
             # emb, hid, out
             _, _, ext_pred = model(past_data, x)

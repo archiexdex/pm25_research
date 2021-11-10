@@ -146,6 +146,8 @@ def get_trainer(opt):
         trainer = class_trainer
     elif opt.method == "transformer":
         trainer = tf_trainer
+    else:
+        raise ValueError(f"--method does not support {opt.method}")
     return trainer
 
 #################################
@@ -186,29 +188,31 @@ def get_mask(opt, data, thres_data):
         mask[index] = 1
     return mask
 
-def get_split_dataset(opt, data):
+def get_split_dataset(opt, data, mask):
     """
-        data: [data len, 17] 
+        data: [data len, input_dim] 
+        mask: [data len, 1]
         mode: 'norm', 'ext'
     """
-    mask = data[:, -1]
     size = data.shape[0]
     shift = opt.memory_size + opt.source_size + opt.target_size
-
+    _data = []
+    _mask = []
     if opt.split_mode == "norm":
-        _data = []
         for i in range(size - shift) :
-            tmp = data[i: i + shift]
+            data_patch = data[i: i + shift]
+            mask_patch = mask[i: i + shift]
             # check whether the extreme event is in the target_size? 
-            if np.sum(tmp[shift - opt.target_size: , -1]) < 1:
-                _data.append(tmp)
-        
+            if np.sum(mask_path[shift - opt.target_size:]) < 1:
+                _data.append(data_path)
+                _mask.append(mask_path)
     elif opt.split_mode == "ext":
-        _data = []
         for i in range(size - shift) :
-            tmp = data[i: i + shift]
+            data_path = data[i: i + shift]
+            mask_path = mask[i: i + shift]
             # check whether the extreme event is in the target_size? 
-            if np.sum(tmp[shift - opt.target_size: , -1]) > 0:
-                _data.append(tmp)
+            if np.sum(mask[shift - opt.target_size:]) > 0:
+                _data.append(data_path)
+                _mask.append(mask_path)
 
-    return np.array(_data)
+    return np.array(_data), np.array(_mask)

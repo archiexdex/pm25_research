@@ -77,7 +77,8 @@ class Encoder(nn.Module):
         self.bidirectional = bidirectional
 
         self.emb = nn.Linear(input_dim, embed_dim)
-        self.enc = nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=bidirectional)
+        self.enc = nn.GRU(embed_dim, hid_dim, batch_first=True, num_layers=num_layers, dropout=dropout, bidirectional=self.bidirectional) if num_layers > 1 \
+              else nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
         self.dropout = nn.Dropout(dropout)
         self.enc_fc = nn.Linear(hid_dim * 2, hid_dim) if bidirectional else nn.Linear(hid_dim, hid_dim)
 
@@ -119,8 +120,8 @@ class Decoder(nn.Module):
         
         self.attention = attention
         self.emb = nn.Linear(input_dim, embed_dim)
-        self.dec = nn.GRU(embed_dim + hid_dim * 2, hid_dim, batch_first=True) if bidirectional else nn.GRU(embed_dim + hid_dim, hid_dim, batch_first=True)
-        self.dec_fc = nn.Linear(hid_dim, output_dim)
+        self.dec = nn.GRU(hid_dim * 2, hid_dim, batch_first=True) if bidirectional else nn.GRU(embed_dim + hid_dim, hid_dim, batch_first=True)
+        #self.out_fc = nn.Linear(hid_dim, output_dim) 
         self.out_fc = nn.Linear(hid_dim*2 + hid_dim + embed_dim, output_dim) if bidirectional else nn.Linear(hid_dim + hid_dim + embed_dim, output_dim)
         self.dropout = nn.Dropout(dropout)
 
@@ -135,18 +136,18 @@ class Decoder(nn.Module):
         #print("a ", a.shape)
         weight = torch.bmm(a, enc_out)
         #print("weight: ",  weight.shape)
+        #rnn_input = embed + weight
         rnn_input = torch.cat((embed, weight), dim=-1)
         #print("rnn_input: ", rnn_input.shape)
         output, hidden = self.dec(rnn_input, hidden.unsqueeze(0))
         hidden = hidden.squeeze(0)
         #print("output: ", output.shape)
         #print("hidden:", hidden.shape)
-        prediction = self.out_fc(torch.cat((output, weight, embed), dim=-1))
-        output = self.dec_fc(output)
+        output = self.out_fc(torch.cat((output, weight, embed), dim=-1))
+        #output = self.out_fc(output + weight + embed)
         #print("output: ", output.shape)
         #print("hidden:", hidden.shape)
-        #print("prediction:", prediction.shape)
-        return output.squeeze(-1), hidden, prediction.squeeze(-1)
+        return output.squeeze(-1), hidden
 
 
 class Seq2Seq(nn.Module):
@@ -174,22 +175,20 @@ class Seq2Seq(nn.Module):
         output_size = self.output_dim
         # Tensor to store decoder outputs
         outputs     = torch.zeros(batch_size, trg_size, output_size).to(self.device)
-        predictions = torch.zeros(batch_size, trg_size, output_size).to(self.device)
         # Encode
         enc_out, hidden = self.encoder(past_window)
         x = xs[:, 0]
         for i in range(trg_size):
             # Decode
-            output, hidden, prediction = self.decoder(x, hidden, enc_out)
+            output, hidden = self.decoder(x, hidden, enc_out)
             # place predictions in a tensor holding predictions for each token
             outputs    [:, i] = output
-            predictions[:, i] = prediction
             # teacher force
             # teacher_force = random.random() < teacher_force_ratio
             x = xs[:, i] # if teacher_force else output
-        predictions = torch.sigmoid(predictions)
+        outputs = torch.sigmoid(outputs)
         
-        return outputs, predictions 
+        return outputs
 
 class Fudan(nn.Module):
     def __init__(self, opt):
@@ -297,7 +296,8 @@ class MultiHeadAttentionLayer(nn.Module):
         attention = torch.softmax(energy, dim = -1)
         #attention = [batch size, n heads, query len, key len]
 
-        x = torch.matmul(self.dropout(attention), V)
+        x = torch.matmul(attention, V)
+        #x = torch.matmul(self.dropout(attention), V)
         #x = [batch size, n heads, query len, head dim]
 
         x = x.contiguous().view(batch_size, -1, self.hid_dim)
@@ -353,14 +353,16 @@ class EncoderLayer(nn.Module):
         _src, _ = self.self_attention(src, src, src)
 
         #dropout, residual connection and layer norm
-        src = self.self_attn_layer_norm(src + self.dropout(_src))
+        src = self.self_attn_layer_norm(src + _src)
+        #src = self.self_attn_layer_norm(src + self.dropout(_src))
         #src = [batch size, src len, hid dim]
 
         #positionwise feedforward
         _src = self.positionwise_feedforward(src)
 
         #dropout, residual and layer norm
-        src = self.ff_layer_norm(src + self.dropout(_src))
+        src = self.ff_layer_norm(src + _src)
+        #src = self.ff_layer_norm(src + self.dropout(_src))
         #src = [batch size, src len, hid dim]
 
         return src
@@ -392,21 +394,24 @@ class DecoderLayer(nn.Module):
         _trg, _ = self.self_attention(trg, trg, trg)
 
         #dropout, residual connection and layer norm
-        trg = self.self_attn_layer_norm(trg + self.dropout(_trg))
+        trg = self.self_attn_layer_norm(trg + _trg)
+        #trg = self.self_attn_layer_norm(trg + self.dropout(_trg))
         #trg = [batch size, trg len, hid dim]
 
         #encoder attention
         _trg, attention = self.encoder_attention(trg, enc_src, enc_src)
 
         #dropout, residual connection and layer norm
-        trg = self.enc_attn_layer_norm(trg + self.dropout(_trg))
+        trg = self.enc_attn_layer_norm(trg + _trg)
+        #trg = self.enc_attn_layer_norm(trg + self.dropout(_trg))
         #trg = [batch size, trg len, hid dim]
 
         #positionwise feedforward
         _trg = self.positionwise_feedforward(trg)
 
         #dropout, residual and layer norm
-        trg = self.ff_layer_norm(trg + self.dropout(_trg))
+        trg = self.ff_layer_norm(trg + _trg)
+        #trg = self.ff_layer_norm(trg + self.dropout(_trg))
         #trg = [batch size, trg len, hid dim]
         #attention = [batch size, n heads, trg len, src len]
 

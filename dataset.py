@@ -22,7 +22,7 @@ class PMDataset(Dataset):
         # Get split data
         if opt.split_dataset:
             assert opt.split_mode != None, f"split dataset method should setting split_mode e.x: --split_mode 'norm'"
-            self.data = get_split_dataset(opt, self.data)
+            self.data, self.mask = get_split_dataset(opt, self.data, self.mask)
             self.size = self.data.shape[0]
         else:
             self.size = self.data.shape[0] - opt.memory_size - opt.source_size - opt.target_size + 1
@@ -40,20 +40,20 @@ class PMDataset(Dataset):
             past_window = self.data[idx][: self.opt.memory_size]
             x           = self.data[idx][self.opt.memory_size: self.opt.memory_size+self.opt.source_size]
             y           = self.data[idx][self.opt.memory_size+self.opt.target_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size, 7: 8]
-            y_ext       = self.data[idx][self.opt.memory_size+self.opt.target_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size, -1: ]
+            y_ext       = self.mask[idx][self.opt.memory_size+self.opt.target_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size]
         else:
             st = idx 
             ed = idx + self.opt.memory_size
-            past_window = self.data[st: ed]
+            past_window = self.data[st: ed, 7: 8]
             
             st = idx + self.opt.memory_size
             ed = idx + self.opt.memory_size + self.opt.source_size
-            x = self.data[st: ed]
+            x = self.data[st: ed, 7: 8]
 
             st = idx + self.opt.memory_size + self.opt.target_size
             ed = idx + self.opt.memory_size + self.opt.source_size + self.opt.target_size
             y = self.data[st: ed, 7: 8]
-            y_ext = self.data[st: ed, -1: ]
+            y_ext = self.mask[st: ed]
 
         return  torch.FloatTensor(x),\
                 torch.FloatTensor(y),\
