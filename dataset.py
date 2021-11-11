@@ -50,7 +50,7 @@ class PMDataset(Dataset):
             ed = idx + self.opt.memory_size + self.opt.source_size
             x = self.data[st: ed, 7: 8]
 
-            st = idx + self.opt.memory_size + self.opt.target_size
+            st = idx + self.opt.memory_size + self.opt.source_size
             ed = idx + self.opt.memory_size + self.opt.source_size + self.opt.target_size
             y = self.data[st: ed, 7: 8]
             y_ext = self.mask[st: ed]
@@ -114,8 +114,8 @@ class PMFudanDataset(Dataset):
         ed = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size
         x = self.data[st: ed]
         # Target, only predict pm2.5, so select '7:8'
-        st = idx + self.opt.memory_size + self.opt.window_size + self.opt.target_size
-        ed = idx + self.opt.memory_size + self.opt.window_size + self.opt.target_size + self.opt.source_size 
+        st = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size
+        ed = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size + self.opt.target_size
         y       = self.data      [st: ed, 7:8]
         y_ext   = self.mask      [st: ed]
         thres_y = self.thres_data[st: ed, 7:8]

@@ -11,16 +11,16 @@ class RNN(nn.Module):
         input_dim        = opt.input_dim
         embed_dim        = opt.embed_dim >> 2
         hid_dim          = opt.hid_dim   >> 2
-        output_dim       = opt.output_dim
         source_size      = opt.source_size
         memory_size      = opt.memory_size
         dropout          = opt.dropout
         num_layers       = opt.num_layers
         bidirectional    = opt.bidirectional
         self.target_size = opt.target_size
+        self.output_dim  = opt.output_dim
         # 
         self.dense_emb = nn.Linear(input_dim, embed_dim)
-        self.dense_out = nn.Linear(2 * hid_dim * (memory_size + source_size), output_dim * source_size) if bidirectional else nn.Linear(hid_dim * (memory_size + source_size), output_dim * source_size)
+        self.dense_out = nn.Linear(2 * hid_dim * (memory_size + source_size), output_dim * source_size) if bidirectional else nn.Linear(hid_dim * (memory_size + source_size), self.output_dim * self.target_size)
         self.rnn       = nn.GRU(embed_dim, hid_dim, batch_first=True)
         self.dropout   = nn.Dropout(dropout)
         self.leakyrelu = nn.LeakyReLU()
@@ -36,7 +36,7 @@ class RNN(nn.Module):
         flt = self.dropout(flt)
         out = self.dense_out(flt)
         out = torch.sigmoid(out)
-        out = out.view(-1, source_size, 1)
+        out = out.view(-1, self.target_size, self.output_dim)
         return emb, hid, out
 
 class DNN(nn.Module):
@@ -46,13 +46,14 @@ class DNN(nn.Module):
         input_dim   = opt.input_dim
         embed_dim   = opt.embed_dim >> 2
         hid_dim     = opt.hid_dim   >> 2
-        output_dim  = opt.output_dim
         source_size = opt.source_size
         memory_size = opt.memory_size
+        self.target_size = opt.target_size
+        self.output_dim  = opt.output_dim
         # 
         self.dense_emb  = nn.Linear(input_dim, embed_dim)
         self.dense_hid  = nn.Linear(embed_dim, hid_dim)
-        self.dense_out  = nn.Linear(hid_dim * (memory_size + source_size), output_dim * source_size)
+        self.dense_out  = nn.Linear(hid_dim * (memory_size + source_size), self.output_dim * self.target_size)
         self.dropout    = nn.Dropout()
         self.leakyrelu  = nn.LeakyReLU()
     
@@ -66,7 +67,7 @@ class DNN(nn.Module):
         flt = self.dropout(flt)
         out = self.dense_out(flt)
         out = torch.sigmoid(out)
-        out = out.view(-1, source_size, 1)
+        out = out.view(-1, self.target_size, self.output_dim)
         return emb, hid, out
 
 class Encoder(nn.Module):
@@ -465,12 +466,14 @@ class SADecoder(nn.Module):
         super().__init__()
 
         input_dim  = opt.input_dim
-        output_dim = opt.output_dim
         hid_dim    = opt.hid_dim
         n_layers   = opt.n_layers
         n_heads    = opt.n_heads
         pf_dim     = opt.pf_dim
         dropout    = opt.dropout  
+        source_size = opt.source_size
+        self.target_size = opt.target_size
+        self.output_dim  = opt.output_dim
         
         self.scale = torch.sqrt(torch.FloatTensor([hid_dim])).to(opt.device)
 
@@ -478,7 +481,7 @@ class SADecoder(nn.Module):
         self.pos_embedding = nn.Linear(max_length, hid_dim)
 
         self.layers  = nn.ModuleList([DecoderLayer(opt) for _ in range(n_layers)])
-        self.fc_out  = nn.Linear(hid_dim, output_dim)
+        self.fc_out  = nn.Linear(source_size * hid_dim, self.target_size * self.output_dim)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, trg, enc_src):
@@ -500,7 +503,9 @@ class SADecoder(nn.Module):
         #trg       = [batch size, trg len, hid dim]
         #attention = [batch size, n heads, trg len, src len]
 
+        trg = torch.flatten(trg, 1)
         output = self.fc_out(trg)
+        output = output.view(-1, self.target_size, self.output_dim)
         #output = [batch size, trg len, output dim]
 
         return output, trg, attention
