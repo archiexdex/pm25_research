@@ -9,18 +9,16 @@ class RNN(nn.Module):
         super().__init__()
         # Parse paras
         input_dim        = opt.input_dim
-        embed_dim        = opt.embed_dim >> 2
-        hid_dim          = opt.hid_dim   >> 2
+        embed_dim        = opt.embed_dim 
+        hid_dim          = opt.hid_dim   
         source_size      = opt.source_size
         memory_size      = opt.memory_size
         dropout          = opt.dropout
-        num_layers       = opt.num_layers
-        bidirectional    = opt.bidirectional
         self.target_size = opt.target_size
         self.output_dim  = opt.output_dim
         # 
         self.dense_emb = nn.Linear(input_dim, embed_dim)
-        self.dense_out = nn.Linear(2 * hid_dim * (memory_size + source_size), output_dim * source_size) if bidirectional else nn.Linear(hid_dim * (memory_size + source_size), self.output_dim * self.target_size)
+        self.dense_out = nn.Linear(hid_dim * (memory_size + source_size), self.output_dim * self.target_size)
         self.rnn       = nn.GRU(embed_dim, hid_dim, batch_first=True)
         self.dropout   = nn.Dropout(dropout)
         self.leakyrelu = nn.LeakyReLU()
@@ -29,9 +27,9 @@ class RNN(nn.Module):
         source_size = x.shape[1]
 
         x = torch.cat((past_window, x), dim=1)
-        emb = self.dropout(torch.tanh(self.dense_emb(x)))
+        emb = self.dropout(self.leakyrelu(self.dense_emb(x)))
         hid, _ = self.rnn(emb)
-        hid = torch.tanh(hid)
+        hid = self.leakyrelu(hid)
         flt = torch.flatten(hid, 1)
         flt = self.dropout(flt)
         out = self.dense_out(flt)
@@ -44,8 +42,8 @@ class DNN(nn.Module):
         super().__init__()
         # Parse paras
         input_dim   = opt.input_dim
-        embed_dim   = opt.embed_dim >> 2
-        hid_dim     = opt.hid_dim   >> 2
+        embed_dim   = opt.embed_dim 
+        hid_dim     = opt.hid_dim   
         source_size = opt.source_size
         memory_size = opt.memory_size
         self.target_size = opt.target_size
@@ -61,8 +59,8 @@ class DNN(nn.Module):
         source_size = x.shape[1]
 
         x = torch.cat((past_window, x), dim=1)
-        emb = self.dropout(torch.tanh(self.dense_emb(x)))
-        hid = self.dropout(torch.tanh(self.dense_hid(emb)))
+        emb = self.dropout(self.leakyrelu(self.dense_emb(x)))
+        hid = self.dropout(self.leakyrelu(self.dense_hid(emb)))
         flt = torch.flatten(hid, 1)
         flt = self.dropout(flt)
         out = self.dense_out(flt)
@@ -164,6 +162,7 @@ class Seq2Seq(nn.Module):
         bidirectional    = opt.bidirectional
         self.output_dim  = opt.output_dim
         self.source_size = opt.source_size
+        self.target_size = opt.target_size
         self.device      = opt.device
         # Model
         self.encoder = Encoder(input_dim, embed_dim, self.output_dim, hid_dim, num_layers, dropout, bidirectional)
@@ -172,7 +171,7 @@ class Seq2Seq(nn.Module):
 
     def forward(self, past_window, xs, teacher_force_ratio=0.6):
         batch_size  = xs.shape[0]
-        trg_size    = self.source_size
+        trg_size    = self.target_size
         output_size = self.output_dim
         # Tensor to store decoder outputs
         outputs     = torch.zeros(batch_size, trg_size, output_size).to(self.device)
@@ -202,7 +201,8 @@ class Fudan(nn.Module):
         num_layers    = opt.num_layers
         dropout       = opt.dropout
         num_layers    = opt.num_layers
-        output_dim    = opt.output_dim
+        self.output_dim  = opt.output_dim
+        self.target_size = opt.target_size
 
         self.bidirectional = opt.bidirectional 
         self.device = opt.device
@@ -212,9 +212,9 @@ class Fudan(nn.Module):
                     else nn.GRU(embed_dim, hid_dim, batch_first=True, bidirectional=self.bidirectional)
         self.dropout   = nn.Dropout(dropout)
         self.enc_fc    = nn.Linear(hid_dim * 2, hid_dim) if self.bidirectional else nn.Linear(hid_dim, hid_dim)
-        self.hidden_fc = nn.Linear(hid_dim, output_dim)
-        self.out_fc    = nn.Linear(hid_dim * 2, output_dim) if self.bidirectional else nn.Linear(hid_dim, output_dim)
-        self.bias_fc   = nn.Linear(hid_dim, output_dim)
+        self.hidden_fc = nn.Linear(hid_dim, self.output_dim)
+        self.out_fc    = nn.Linear(hid_dim * 2, self.output_dim) if self.bidirectional else nn.Linear( source_size * hid_dim, self.target_size * self.output_dim)
+        self.bias_fc   = nn.Linear(hid_dim, self.output_dim)
         self.softmax   = nn.Softmax(dim=1)
 
     def forward(self, x, past_window, past_ext):
@@ -243,7 +243,9 @@ class Fudan(nn.Module):
         # alpha: [batch, memory_size, 1]
         indicator_output = torch.bmm(alpha.reshape(-1, 1, past_ext.shape[1]), past_ext)
         # indicator_output: [batch, 1, 1]
+        x_latent = torch.flatten(x_latent, 1)
         output = self.out_fc(x_latent)
+        output = output.view(-1, self.target_size, self.output_dim)
         #output: [batch, source_size, output_dim]
         x_hidden = x_hidden.repeat(1, output.shape[1], 1)
         bias   = self.bias_fc(x_hidden)

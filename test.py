@@ -58,7 +58,7 @@ for sitename in SITENAMES:
         elif opt.model == "transformer":
             ext_pred, _, _ = model(past_data, x)
         elif opt.model == "seq":
-            _, ext_pred = model(past_data, x)
+            ext_pred = model(past_data, x)
         else:
             _, _, ext_pred = model(past_data, x)
         # Recover predict

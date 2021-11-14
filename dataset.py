@@ -97,22 +97,22 @@ class PMFudanDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-            past_windows: [batch, memory_size, window_len, 16]
-            past_ext:     [batch, memory_size, window_len, 1]
-            x:            [batch, source_size, 16]
-            y:            [batch, source_size, 1]
-            y_ext:        [batch, source_size, 1]
+            past_windows: [memory_size, window_len, 16]
+            past_ext:     [memory_size, window_len, 1]
+            x:            [source_size, 16]
+            y:            [source_size, 1]
+            y_ext:        [source_size, 1]
         """
         # Past window, each window has a sequence of data
         indexs = np.arange(idx + self.opt.memory_size)
         np.random.shuffle(indexs)
         sample = indexs[:self.opt.memory_size]
-        past_window = self.all_window[sample]
+        past_window = self.all_window[sample, :, 7:8]
         past_ext    = self.all_ext   [sample]
         # Input
         st = idx + self.opt.memory_size + self.opt.window_size  
         ed = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size
-        x = self.data[st: ed]
+        x = self.data[st: ed, 7:8]
         # Target, only predict pm2.5, so select '7:8'
         st = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size
         ed = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size + self.opt.target_size
