@@ -19,7 +19,7 @@ save_config(opt)
 
 st_t = datetime.now()
 for sitename in SITENAMES:
-    if opt.skip_site == 1 and sitename not in SAMPLE_SITES:
+    if opt.skip_site and sitename not in SAMPLE_SITES:
         continue
     print(sitename)
     # Dataset
@@ -32,11 +32,17 @@ for sitename in SITENAMES:
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, drop_last=True)
     valid_dataloader = DataLoader(valid_dataset, batch_size=opt.batch_size, shuffle=False)
     # Model
-    model = get_model(opt).to(device)
+    if opt.method == "merged":
+        model = get_merged_model(opt, sitename).to(device)
+    else:
+        model = get_model(opt).to(device)
     # Loss
     loss_fn = get_loss(opt)
     # Optimizer
-    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
+    if opt.method in ["merged"]:
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=opt.lr)
+    else:
+        optimizer = optim.Adam(model.parameters(), lr=opt.lr)
     # Parameters
     total_epoch = opt.total_epoch
     patience = opt.patience
@@ -52,7 +58,7 @@ for sitename in SITENAMES:
         if best_loss > valid_loss:
             best_loss = valid_loss
             torch.save( model.state_dict(), 
-                        os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}_{opt.method}_{opt.model}.cpt"))
+                        os.path.join(opt.cpt_dir, str(opt.no), f"{sitename}.cpt"))
             earlystop_counter = 0
             print(f">> Model saved epoch: {epoch}!!")
 

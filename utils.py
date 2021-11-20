@@ -112,6 +112,20 @@ def get_score(y_true, y_pred):
 #################################
 ########## model ################
 #################################
+def get_merged_model(opt, sitename):
+    assert opt.nor_load_model != None, f"Merged method should determine the load model"
+    assert opt.ext_load_model != None, f"Merged method should determine the load model"
+    nor_load_path = os.path.join(opt.cpt_dir, str(opt.nor_load_model), f"{sitename}.cpt")
+    ext_load_path = os.path.join(opt.cpt_dir, str(opt.ext_load_model), f"{sitename}.cpt")
+    nor_model = load_model(nor_load_path, opt)
+    ext_model = load_model(ext_load_path, opt)
+    for p in nor_model.parameters():
+        p.requires_grad = False
+    for p in ext_model.parameters():
+        p.requires_grad = False
+    model = Merged_Model(opt, nor_model, ext_model)
+    return model
+
 def load_model(path, opt):
     checkpoint = torch.load(path)
     model = get_model(opt)
@@ -146,6 +160,8 @@ def get_trainer(opt):
         trainer = class_trainer
     elif opt.method == "transformer":
         trainer = tf_trainer
+    elif opt.method == "merged":
+        trainer = merged_trainer
     else:
         raise ValueError(f"--method does not support {opt.method}")
     return trainer

@@ -34,9 +34,12 @@ for sitename in SITENAMES:
     dataset = get_dataset(opt=opt, sitename=sitename, isTrain=False)
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
     # Model
-    model = get_model(opt)
+    if opt.method == "merged":
+        model = get_merged_model(opt, sitename)
+    else:
+        model = get_model(opt)
     # Load checkpoint
-    model.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}_{opt.method}_{opt.model}.cpt")))
+    model.load_state_dict(torch.load(os.path.join(cpt_dir, f"{sitename}.cpt")))
     # For device
     model.to(opt.device)
     # Freeze model
@@ -53,14 +56,17 @@ for sitename in SITENAMES:
         else:
             x, y_true, ext_true, past_data = map(lambda z: z.to(opt.device), data)
         # get prediction
-        if opt.model == "fudan":
-            _, ext_pred, _ = model(x, past_data, past_ext)
-        elif opt.model == "transformer":
-            ext_pred, _, _ = model(past_data, x)
-        elif opt.model == "seq":
+        if opt.method == "merged":
             ext_pred = model(past_data, x)
         else:
-            _, _, ext_pred = model(past_data, x)
+            if opt.model == "fudan":
+                _, ext_pred, _ = model(x, past_data, past_ext)
+            elif opt.model == "transformer":
+                ext_pred, _, _ = model(past_data, x)
+            elif opt.model == "seq":
+                ext_pred = model(past_data, x)
+            else:
+                _, _, ext_pred = model(past_data, x)
         # Recover predict
         ext_pred[ext_pred>=0.5] = 1
         ext_pred[ext_pred<0.5]  = 0

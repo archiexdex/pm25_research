@@ -35,7 +35,7 @@ class RNN(nn.Module):
         out = self.dense_out(flt)
         out = torch.sigmoid(out)
         out = out.view(-1, self.target_size, self.output_dim)
-        return emb, hid, out
+        return emb, flt, out
 
 class DNN(nn.Module):
     def __init__(self, opt):
@@ -66,7 +66,7 @@ class DNN(nn.Module):
         out = self.dense_out(flt)
         out = torch.sigmoid(out)
         out = out.view(-1, self.target_size, self.output_dim)
-        return emb, hid, out
+        return emb, flt, out
 
 class Encoder(nn.Module):
     def __init__(self, input_dim, embed_dim, output_dim, hid_dim, num_layers=2, dropout=0.6, bidirectional=True):
@@ -539,8 +539,9 @@ class Merged_Model(nn.Module):
         self.opt       = opt
         self.nor_model = nor_model
         self.ext_model = ext_model
-        self.hid_out   = nn.Linear(opt.hid_dim * (opt.memory_size + opt.source_size), opt.hid_dim * opt.source_size)
-        self.fc_out    = nn.Linear(opt.hid_dim<<1, opt.output_dim)
+        self.hid_out   = nn.Linear(opt.hid_dim * opt.source_size, opt.hid_dim * opt.target_size) if opt.model.lower() == "transformer" else \
+                         nn.Linear(opt.hid_dim * (opt.memory_size + opt.source_size), opt.hid_dim * opt.target_size)
+        self.fc_out    = nn.Linear(opt.hid_dim << 1, opt.output_dim)
         self.dropout   = nn.Dropout(opt.dropout)
 
     def forward(self, src, trg):
@@ -549,12 +550,10 @@ class Merged_Model(nn.Module):
 
         _, nor_hidden, _ = self.nor_model(src, trg)
         _, ext_hidden, _ = self.ext_model(src, trg)
-        if nor_hidden.shape[1] != self.opt.source_size:
-            nor_hidden = torch.flatten(nor_hidden, 1)
-            nor_hidden = self.hid_out(nor_hidden).view(-1, self.opt.source_size, self.opt.hid_dim)
-        if ext_hidden.shape[1] != self.opt.source_size:
-            ext_hidden = torch.flatten(ext_hidden, 1)
-            ext_hidden = self.hid_out(ext_hidden).view(-1, self.opt.source_size, self.opt.hid_dim)
+        nor_hidden = self.hid_out(nor_hidden)
+        nor_hidden = nor_hidden.view(-1, self.opt.target_size, self.opt.hid_dim)
+        ext_hidden = self.hid_out(ext_hidden)
+        ext_hidden = ext_hidden.view(-1, self.opt.target_size, self.opt.hid_dim)
         #hidden = [batch size, trg len, hid dim]
         hidden = torch.cat((nor_hidden, ext_hidden), dim=-1)
         output = self.fc_out(hidden)
