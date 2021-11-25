@@ -219,16 +219,16 @@ def get_split_dataset(opt, data, mask):
             data_patch = data[i: i + shift]
             mask_patch = mask[i: i + shift]
             # check whether the extreme event is in the target_size? 
-            if np.sum(mask_path[shift - opt.target_size:]) < 1:
-                _data.append(data_path)
-                _mask.append(mask_path)
+            if np.sum(mask_patch[shift - opt.target_size:]) < 1:
+                _data.append(data_patch)
+                _mask.append(mask_patch)
     elif opt.split_mode == "ext":
         for i in range(size - shift) :
-            data_path = data[i: i + shift]
-            mask_path = mask[i: i + shift]
+            data_patch = data[i: i + shift]
+            mask_patch = mask[i: i + shift]
             # check whether the extreme event is in the target_size? 
-            if np.sum(mask[shift - opt.target_size:]) > 0:
-                _data.append(data_path)
-                _mask.append(mask_path)
+            if np.sum(mask_patch[shift - opt.target_size:]) > 0:
+                _data.append(data_patch)
+                _mask.append(mask_patch)
 
     return np.array(_data), np.array(_mask)

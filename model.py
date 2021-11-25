@@ -34,9 +34,9 @@ def fudan_trainer(opt, dataloader, model, loss_fn, optimizer=None):
             mean_pred_loss += ext_loss.item()
         if optimizer:
             trange.set_description(\
-                f"Training mean loss rmse: {mean_rmse_loss / (idx+1):.3f}, pred: {mean_pred_loss / (idx+1):.3e}, output mse: {mse_loss.item():.3e}, ext: {ext_loss.item():.3e}, his: {his_loss:.3e}")
+                f"Training mean loss rmse: {mean_rmse_loss / (idx+1):.4e}, pred: {mean_pred_loss / (idx+1):.4e}, output mse: {mse_loss.item():.4e}, ext: {ext_loss.item():.4e}, his: {his_loss:.4e}")
         else:
-            trange.set_description(f"Validation mean rmse: \33[91m>>{mean_rmse_loss / (idx+1):.3f}, pred: {mean_pred_loss / (idx+1):.3e}<<\33[0m")
+            trange.set_description(f"Validation mean rmse: \33[91m>>{mean_rmse_loss / (idx+1):.4e}, pred: {mean_pred_loss / (idx+1):.4e}<<\33[0m")
     mean_rmse_loss /= len(dataloader)
     mean_pred_loss /= len(dataloader)
     return mean_pred_loss
@@ -68,9 +68,9 @@ def class_trainer(opt, dataloader, model, loss_fn, optimizer=None):
         # Record loss
         mean_loss += loss.item()
         if optimizer:
-            trange.set_description(f"Training mean loss: {mean_loss / (idx+1):.3f}")
+            trange.set_description(f"Training mean loss: {mean_loss / (idx+1):.4e}")
         else:
-            trange.set_description(f"Validation mean: \33[91m>>{mean_loss / (idx+1):.3f}<<\33[0m")
+            trange.set_description(f"Validation mean: \33[91m>>{mean_loss / (idx+1):.4e}<<\33[0m")
     mean_loss /= len(dataloader)
     return mean_loss
 
@@ -97,9 +97,9 @@ def tf_trainer(opt, dataloader, model, loss_fn, optimizer=None):
         # Record loss
         mean_loss += loss.item()
         if optimizer:
-            trange.set_description(f"Training mean loss: {mean_loss / (idx+1):.3f}")
+            trange.set_description(f"Training mean loss: {mean_loss / (idx+1):.4e}")
         else:
-            trange.set_description(f"Validation mean: \33[91m>>{mean_loss / (idx+1):.3f}<<\33[0m")
+            trange.set_description(f"Validation mean: \33[91m>>{mean_loss / (idx+1):.4e}<<\33[0m")
     mean_loss /= len(dataloader)
     return mean_loss
 
@@ -127,9 +127,9 @@ def merged_trainer(opt, dataloader, model, loss_fn, optimizer=None):
         mean_loss += loss.item()
         if optimizer:
             trange.set_description(\
-                f"Training mean loss: {mean_loss / (idx+1):.3f}")
+                f"Training mean loss: {mean_loss / (idx+1):.4e}")
         else:
             trange.set_description(\
-                f"Validation mean: \33[91m>>{mean_loss / (idx+1):.3f}<<\33[0m")
+                f"Validation mean: \33[91m>>{mean_loss / (idx+1):.4e}<<\33[0m")
     mean_loss /= len(dataloader)
     return mean_loss

@@ -37,10 +37,10 @@ class PMDataset(Dataset):
         """
         """
         if self.opt.split_dataset:
-            past_window = self.data[idx][: self.opt.memory_size]
-            x           = self.data[idx][self.opt.memory_size: self.opt.memory_size+self.opt.source_size]
-            y           = self.data[idx][self.opt.memory_size+self.opt.target_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size, 7: 8]
-            y_ext       = self.mask[idx][self.opt.memory_size+self.opt.target_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size]
+            past_window = self.data[idx][: self.opt.memory_size, 7: 8]
+            x           = self.data[idx][self.opt.memory_size: self.opt.memory_size+self.opt.source_size, 7: 8]
+            y           = self.data[idx][self.opt.memory_size+self.opt.source_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size, 7: 8]
+            y_ext       = self.mask[idx][self.opt.memory_size+self.opt.source_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size]
         else:
             st = idx 
             ed = idx + self.opt.memory_size
