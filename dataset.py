@@ -37,18 +37,22 @@ class PMDataset(Dataset):
         """
         """
         if self.opt.split_dataset:
-            past_window = self.data[idx][: self.opt.memory_size, 7: 8]
-            x           = self.data[idx][self.opt.memory_size: self.opt.memory_size+self.opt.source_size, 7: 8]
+            if self.opt.only_pm25:
+                past_window = self.data[idx][: self.opt.memory_size, 7: 8]
+                x           = self.data[idx][self.opt.memory_size: self.opt.memory_size+self.opt.source_size, 7: 8]
+            else:
+                past_window = self.data[idx][: self.opt.memory_size]
+                x           = self.data[idx][self.opt.memory_size: self.opt.memory_size+self.opt.source_size]
             y           = self.data[idx][self.opt.memory_size+self.opt.source_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size, 7: 8]
             y_ext       = self.mask[idx][self.opt.memory_size+self.opt.source_size: self.opt.memory_size+self.opt.source_size+self.opt.target_size]
         else:
             st = idx 
             ed = idx + self.opt.memory_size
-            past_window = self.data[st: ed, 7: 8]
+            past_window = self.data[st: ed, 7: 8] if self.opt.only_pm25 else self.data[st: ed]
             
             st = idx + self.opt.memory_size
             ed = idx + self.opt.memory_size + self.opt.source_size
-            x = self.data[st: ed, 7: 8]
+            x = self.data[st: ed, 7: 8] if self.opt.only_pm25 else self.data[st: ed]
 
             st = idx + self.opt.memory_size + self.opt.source_size
             ed = idx + self.opt.memory_size + self.opt.source_size + self.opt.target_size
@@ -107,12 +111,12 @@ class PMFudanDataset(Dataset):
         indexs = np.arange(idx + self.opt.memory_size)
         np.random.shuffle(indexs)
         sample = indexs[:self.opt.memory_size]
-        past_window = self.all_window[sample, :, 7:8]
+        past_window = self.all_window[sample, :, 7:8] if self.opt.only_pm25 else self.all_window[sample]
         past_ext    = self.all_ext   [sample]
         # Input
         st = idx + self.opt.memory_size + self.opt.window_size  
         ed = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size
-        x = self.data[st: ed, 7:8]
+        x = self.data[st: ed, 7:8] if self.opt.only_pm25 else self.data[st: ed]
         # Target, only predict pm2.5, so select '7:8'
         st = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size
         ed = idx + self.opt.memory_size + self.opt.window_size + self.opt.source_size + self.opt.target_size

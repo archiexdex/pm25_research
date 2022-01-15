@@ -33,6 +33,7 @@ def add_arguments(parser):
     parser.add_argument('--delta',           type=int,   default=10,   help='')
     parser.add_argument('--use_delta',       action='store_true',  help='')
     parser.add_argument('--use_abs_delta',   action='store_true',  help='')
+    parser.add_argument('--only_pm25',       action='store_true',  help='')
     parser.add_argument('--no_concat_label', action='store_true',  help='')
     parser.add_argument('--split_dataset',   action='store_true',  help='')
     parser.add_argument('--split_mode',      type=str, choices=['norm', 'ext', None], default=None,  help='It should be setting when --is_split_dataset=True')
