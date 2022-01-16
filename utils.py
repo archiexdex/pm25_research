@@ -142,7 +142,7 @@ def get_model(opt):
         model = Seq2Seq(opt)
     elif name == "fudan":
         model = Fudan(opt)
-    elif name == "transformer":
+    elif name == "xfmr":
         model = Transformer(opt)
     return model
 
@@ -158,7 +158,7 @@ def get_trainer(opt):
         trainer = fudan_trainer
     elif opt.method == "class":
         trainer = class_trainer
-    elif opt.method == "transformer":
+    elif opt.method == "xfmr":
         trainer = tf_trainer
     elif opt.method == "merged":
         trainer = merged_trainer
